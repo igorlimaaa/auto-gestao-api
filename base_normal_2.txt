@@ -1,0 +1,6 @@
+DELETE FROM qrtz_cron_triggers;
+DELETE FROM qrtz_fired_triggers;
+DELETE FROM qrtz_simple_triggers;
+DELETE FROM qrtz_triggers;
+DELETE FROM qrtz_job_details;
+DELETE FROM tb_parametro where vl_variavel like '%:%:-7%';
