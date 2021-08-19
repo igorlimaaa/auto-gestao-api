@@ -28,5 +28,11 @@ public interface CondominioMapper {
 	@Mapping(source = "nr_telefone", target = "numeroTelefone")
 	@Mapping(source = "vl_taxa", target = "valorTaxa")
 	CondominioDto condominioDomainToDto(Condominio condominioDomain);
+	
+	@Mapping(source = "id", target = "id")
+	@Mapping(source = "nr_ddd", target = "ddd")
+	@Mapping(source = "nr_telefone", target = "numeroTelefone")
+	@Mapping(source = "vl_taxa", target = "valorTaxa")
+	List<CondominioDto> listCondominioDomainToDto(List<Condominio> condominioDomain);
 
 }

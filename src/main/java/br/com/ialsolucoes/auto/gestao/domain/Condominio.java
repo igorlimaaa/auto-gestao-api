@@ -2,8 +2,6 @@ package br.com.ialsolucoes.auto.gestao.domain;
 
 import static javax.persistence.GenerationType.IDENTITY;
 
-import java.math.BigDecimal;
-
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
