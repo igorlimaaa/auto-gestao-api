@@ -8,12 +8,11 @@ import lombok.Setter;
 @Getter
 @Setter
 @Component
-public class CondominioDto {
-	
-	private Long id;
-	private Integer ddd;
-	private Long numeroTelefone;
-	private Double valorTaxa;
-	private EnderecoDto endereco;
+public class EnderecoDto {
 
+	private Long id;
+	private Long cep;
+	private String endereco;
+	private String complemento;
+	
 }
