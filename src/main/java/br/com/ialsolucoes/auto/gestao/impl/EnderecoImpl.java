@@ -1,5 +1,8 @@
 package br.com.ialsolucoes.auto.gestao.impl;
 
+import java.util.List;
+import java.util.Optional;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -23,6 +26,15 @@ public class EnderecoImpl implements EnderecoService{
 		Endereco enderecoDomain = mapper.enderecoDtoToDomain(enderecoDto);
 		enderecoDomain = enderecoRepository.save(enderecoDomain);
 		return mapper.enderecoDomainToDto(enderecoDomain);
+	}
+
+	@Override
+	public List<EnderecoDto> getEnderecos() {
+		Optional<List<Endereco>> end = Optional.of(enderecoRepository.findAll());
+		if(end.isPresent()) {
+			return mapper.listEnderecoDomainToDto(end.get());
+		}
+		return null;
 	}
 
 	

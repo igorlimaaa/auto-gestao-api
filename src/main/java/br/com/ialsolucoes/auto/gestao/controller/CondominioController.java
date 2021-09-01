@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import br.com.ialsolucoes.auto.gestao.dto.CondominioDto;
+import br.com.ialsolucoes.auto.gestao.dto.TaxaExtraDto;
 import br.com.ialsolucoes.auto.gestao.service.CondominioService;
 
 @RestController
@@ -35,6 +36,11 @@ public class CondominioController {
 	@PostMapping
 	public ResponseEntity<CondominioDto> createCondominio(@Valid @RequestBody CondominioDto condominioDTo){
 		return new ResponseEntity<CondominioDto>(condominioService.createNewCondominio(condominioDTo), null, HttpStatus.CREATED);
+	}
+	
+	@PostMapping("/taxaExtra")
+	public ResponseEntity<TaxaExtraDto> createTaxa(@Valid @RequestBody TaxaExtraDto taxaDto){
+		return new ResponseEntity<TaxaExtraDto>(condominioService.createTaxaExtra(taxaDto), null, HttpStatus.CREATED);
 	}
 
 	

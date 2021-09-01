@@ -1,5 +1,7 @@
 package br.com.ialsolucoes.auto.gestao.dto;
 
+import java.util.Date;
+
 import org.springframework.stereotype.Component;
 
 import lombok.AllArgsConstructor;
@@ -12,11 +14,13 @@ import lombok.Setter;
 @AllArgsConstructor
 @NoArgsConstructor
 @Component
-public class EnderecoDto {
-
-	private Long id;
-	private Long cep;
-	private String endereco;
-	private String complemento;
+public class TaxaExtraDto {
 	
+	private Long id;
+	private CondominioDto condominio;
+	private Double valorTaxaExtra;
+	private Integer numeroParcelas;
+	private String descricaoTaxa;
+	private Date dataCadastro;
+
 }

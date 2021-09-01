@@ -2,6 +2,7 @@ package br.com.ialsolucoes.auto.gestao.dto;
 
 import org.springframework.stereotype.Component;
 
+import br.com.ialsolucoes.auto.gestao.enumeration.MeioContatoEnum;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -12,11 +13,11 @@ import lombok.Setter;
 @AllArgsConstructor
 @NoArgsConstructor
 @Component
-public class EnderecoDto {
-
-	private Long id;
-	private Long cep;
-	private String endereco;
-	private String complemento;
+public class MeioContatoDto {
 	
+	private Long id;
+	private PessoaDto pessoa;
+	private MeioContatoEnum tipoMeioContato;
+	private String identificacao;
+
 }
