@@ -43,8 +43,8 @@ public class CondominioImpl implements CondominioService {
 		List<Condominio> listCondDomain = condominioRepository.findAll();
 		List<TaxaExtra> listTaxaExtra = taxaRepository.findAll();
 		List<CondominioDto> listDto = mapper.listCondominioDomainToDto(listCondDomain);		
-		preencherValorTaxasExtras(listDto, listTaxaExtra);
-		preencherValorFinal(listDto);
+		preencherListValorTaxasExtras(listDto, listTaxaExtra);
+		preencherListValorFinal(listDto);
 		return listDto;
 	}
 
@@ -81,30 +81,68 @@ public class CondominioImpl implements CondominioService {
 		return mapperTaxa.taxaExtraDomainToDto(taxaDomain);
 	}
 	
-	private List<CondominioDto> preencherValorTaxasExtras(List<CondominioDto> listDto, List<TaxaExtra> listTaxaExtra){
+	private List<CondominioDto> preencherListValorTaxasExtras(List<CondominioDto> listDto, List<TaxaExtra> listTaxaExtra){
 		listDto.stream().forEach(listDtoCond -> {
-			if(listDtoCond.getPossuiTaxaExtra()) {
-				listTaxaExtra.stream().filter(listTaxa -> listDtoCond.getId() == listTaxa.getCondominio().getId()).forEach(condDto -> {
-					Double valor = listDtoCond.getValorTaxasExtras() != null ? listDtoCond.getValorTaxasExtras() : DOUBLE_ZERO;
-					valor += condDto.getValorTaxaExtra();
-					listDtoCond.setValorTaxasExtras(valor);
-				});				
-			}else {
-				listDtoCond.setValorTaxasExtras(DOUBLE_ZERO);
-			}
+			preencherValorTaxasExtras(listDtoCond, listTaxaExtra);
 		});
 		return listDto;
 	}
 	
-	private List<CondominioDto> preencherValorFinal(List<CondominioDto> listDto){
+	private CondominioDto preencherValorTaxasExtras(CondominioDto condominioDto, List<TaxaExtra> listTaxaExtra) {
+		if (condominioDto.getPossuiTaxaExtra()) {
+			listTaxaExtra.stream().filter(listTaxa -> condominioDto.getId() == listTaxa.getCondominio().getId())
+					.forEach(condDto -> {
+						Double valor = condominioDto.getValorTaxasExtras() != null ? condominioDto.getValorTaxasExtras()
+								: DOUBLE_ZERO;
+						valor += condDto.getValorTaxaExtra();
+						condominioDto.setValorTaxasExtras(valor);
+					});
+		} else {
+			condominioDto.setValorTaxasExtras(DOUBLE_ZERO);
+		}
+		return condominioDto;
+	}
+	
+	private List<CondominioDto> preencherListValorFinal(List<CondominioDto> listDto){
 		listDto.stream().forEach(listDtoCond -> {
-			if(listDtoCond.getPossuiTaxaExtra()) {
-				listDtoCond.setValorTotalPorUnidade(listDtoCond.getValorTaxasExtras() + listDtoCond.getValorTaxaCondominial());
-			}else {
-				listDtoCond.setValorTotalPorUnidade(listDtoCond.getValorTaxaCondominial());
-			}
+			preencherValorFinal(listDtoCond);
 		});
 		return listDto;
+	}
+	
+	private CondominioDto preencherValorFinal(CondominioDto condDto) {
+		if(condDto.getPossuiTaxaExtra()) {
+			condDto.setValorTotalPorUnidade(condDto.getValorTaxasExtras() + condDto.getValorTaxaCondominial());
+		}else {
+			condDto.setValorTotalPorUnidade(condDto.getValorTaxaCondominial());
+		}
+		return condDto;
+	}
+
+	@Override
+	public List<TaxaExtraDto> listTaxaExtra(Long idCondominio) {
+		List<TaxaExtra> listTaxaExtra = taxaRepository.findAllByCondominioId(idCondominio);
+		if(!listTaxaExtra.isEmpty() && listTaxaExtra != null) {
+			List<TaxaExtraDto> listTaxaExtraDomainToDto = mapperTaxa.listTaxaExtraDomainToDto(listTaxaExtra);
+			for(TaxaExtraDto forList : listTaxaExtraDomainToDto) {
+				forList.setCondominio(null);
+			}
+			return listTaxaExtraDomainToDto;
+		}
+		return null;
+	}
+
+	@Override
+	public CondominioDto findCondominio(Long idCondominio) {
+		Optional<Condominio> cond = condominioRepository.findById(idCondominio);
+		if(cond.isPresent()) {
+			CondominioDto condominioDomainToDto = mapper.condominioDomainToDto(cond.get());
+			List<TaxaExtra> listTaxaExtra = taxaRepository.findAllByCondominioId(condominioDomainToDto.getId());
+			preencherValorTaxasExtras(condominioDomainToDto, listTaxaExtra);
+			preencherValorFinal(condominioDomainToDto);
+			return condominioDomainToDto;
+		}
+		return null;
 	}
 	
 }

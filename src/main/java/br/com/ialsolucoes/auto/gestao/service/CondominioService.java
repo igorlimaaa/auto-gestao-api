@@ -14,6 +14,10 @@ public interface CondominioService {
 	
 	public CondominioDto createNewCondominio(CondominioDto condominioDTo);
 	
+	public CondominioDto findCondominio(Long idCondominio);
+	
 	public TaxaExtraDto createTaxaExtra(TaxaExtraDto taxaDto);
+	
+	public List<TaxaExtraDto> listTaxaExtra(Long idCondominio);
 
 }
