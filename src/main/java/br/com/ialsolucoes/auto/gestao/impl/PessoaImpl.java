@@ -1,6 +1,7 @@
 package br.com.ialsolucoes.auto.gestao.impl;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -44,6 +45,33 @@ public class PessoaImpl implements PessoaService{
 		MeioContato meioDomain = mapper.meioContatoDtoToDomain(meioContato);
 		meioDomain = meioContatoRepository.save(meioDomain);
 		return mapper.meioContatoDomainToDto(meioDomain);
+	}
+
+	@Override
+	public List<PessoaDto> findPessoas() {
+		List<Pessoa> listPessoa = pessoaRepository.findAll();
+		if(!listPessoa.isEmpty()) {
+			return mapper.listPessoaDomainToDto(listPessoa);
+		}
+		return null;
+	}
+
+	@Override
+	public PessoaDto findPessoaId(Long idPessoa) {
+		Optional<Pessoa> pessoa = pessoaRepository.findById(idPessoa);
+		if(pessoa.isPresent()) {
+			return mapper.pessoaDomainToDto(pessoa.get());
+		}
+		return null;
+	}
+
+	@Override
+	public List<PessoaDto> findPessoasCondominioId(Long idCondominio) {
+		List<Pessoa> listPessoa = pessoaRepository.findByCondominioId(idCondominio);
+		if(!listPessoa.isEmpty()) {
+			return mapper.listPessoaDomainToDto(listPessoa);
+		}
+		return null;
 	}
 
 }

@@ -15,4 +15,6 @@ import br.com.ialsolucoes.auto.gestao.domain.Pessoa;
 public interface PessoaRepository extends JpaRepository<Pessoa, Long> {
  
 	List<Pessoa> findByCondominioIdAndEnvioTaxaEmail(Long condominioId, Boolean envioEmail);
+	
+	List<Pessoa> findByCondominioId(Long condominioId);
 }

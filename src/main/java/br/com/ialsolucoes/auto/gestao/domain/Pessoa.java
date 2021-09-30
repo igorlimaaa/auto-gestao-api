@@ -43,6 +43,9 @@ public class Pessoa {
 	@Column(name = "in_envio_impresso", columnDefinition="boolean default false")
 	private Boolean envioImpresso;
 	
+	@Column(name = "in_sindico", columnDefinition="boolean default false")
+	private Boolean isSindico;
+	
 	@OneToOne
 	@JoinColumn(name="id_condominio", nullable = false)
 	private Condominio condominio;

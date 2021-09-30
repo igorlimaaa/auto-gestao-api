@@ -11,6 +11,7 @@ import br.com.ialsolucoes.auto.gestao.domain.Endereco;
 import br.com.ialsolucoes.auto.gestao.domain.TaxaExtra;
 import br.com.ialsolucoes.auto.gestao.dto.CondominioDto;
 import br.com.ialsolucoes.auto.gestao.dto.TaxaExtraDto;
+import br.com.ialsolucoes.auto.gestao.exception.EnderecoNaoEncontradoException;
 import br.com.ialsolucoes.auto.gestao.mapper.CondominioMapper;
 import br.com.ialsolucoes.auto.gestao.mapper.TaxaExtraMapper;
 import br.com.ialsolucoes.auto.gestao.repository.CondominioRepository;
@@ -49,7 +50,13 @@ public class CondominioImpl implements CondominioService {
 	}
 
 	@Override
-	public CondominioDto createNewCondominio(CondominioDto condominioDTo) {
+	public CondominioDto createNewCondominio(CondominioDto condominioDTo) throws Exception{
+		if(condominioDTo.getEndereco() != null && condominioDTo.getEndereco().getId() != null) {
+			Optional<Endereco> hasEndereco = enderecoRepository.findById(condominioDTo.getEndereco().getId());
+			if(!hasEndereco.isPresent()) {
+				throw new EnderecoNaoEncontradoException("Endereco id \"" + condominioDTo.getEndereco().getId() + "não encontrado ou não existe");
+			}
+		}
 		condominioDTo = validarMultaEjuros(condominioDTo);
 		Condominio condominoDomain = mapper.condominioDtoToDomain(condominioDTo);
 		condominoDomain = condominioRepository.save(condominoDomain);

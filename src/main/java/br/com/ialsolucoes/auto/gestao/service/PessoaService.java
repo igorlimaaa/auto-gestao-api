@@ -15,5 +15,11 @@ public interface PessoaService {
 	public List<PessoaDto> findPessoasEnvioEmail(Long idCondominio);
 	
 	public MeioContatoDto createMeioContato(MeioContatoDto meioContato);
+	
+	public List<PessoaDto> findPessoas();
+	
+	public PessoaDto findPessoaId(Long idPessoa);
+	
+	public List<PessoaDto> findPessoasCondominioId(Long idCondominio);
 
 }

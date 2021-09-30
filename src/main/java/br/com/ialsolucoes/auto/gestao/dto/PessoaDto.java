@@ -20,6 +20,7 @@ public class PessoaDto {
 	private Long numeroUnidade;
 	private Boolean envioTaxaEmail;
 	private Boolean envioImpresso;
+	private Boolean isSindico;
 	private CondominioDto condominio;
 	private EnderecoDto endereco;
 

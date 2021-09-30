@@ -12,7 +12,7 @@ public interface CondominioService {
 	
 	public List<CondominioDto> listCondominios();
 	
-	public CondominioDto createNewCondominio(CondominioDto condominioDTo);
+	public CondominioDto createNewCondominio(CondominioDto condominioDTo) throws Exception;
 	
 	public CondominioDto findCondominio(Long idCondominio);
 	

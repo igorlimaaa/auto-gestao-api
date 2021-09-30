@@ -25,23 +25,38 @@ import br.com.ialsolucoes.auto.gestao.service.PessoaService;
 @Transactional
 @ResponseBody
 public class PessoaController {
-	
+
 	@Autowired
 	private PessoaService pessoaService;
-	
+
 	@PostMapping
-	public ResponseEntity<PessoaDto> savePessoa(@Valid @RequestBody PessoaDto pessoaDto){
+	public ResponseEntity<PessoaDto> savePessoa(@Valid @RequestBody PessoaDto pessoaDto) {
 		return new ResponseEntity<>(pessoaService.createNewPessoa(pessoaDto), null, HttpStatus.CREATED);
 	}
-	
+
 	@GetMapping("/findEnvioPorEmailPorCondominio/{id}")
-	public ResponseEntity<List<PessoaDto>> findEnvioPorEmailPorCondominio(@PathVariable Long id){
+	public ResponseEntity<List<PessoaDto>> findEnvioPorEmailPorCondominio(@PathVariable Long id) {
 		return new ResponseEntity<>(pessoaService.findPessoasEnvioEmail(id), null, HttpStatus.OK);
 	}
-	
+
 	@PostMapping("/meioContatoPessoa")
-	public ResponseEntity<MeioContatoDto> saveMeioContato(@Valid @RequestBody MeioContatoDto meioContatoDto){
+	public ResponseEntity<MeioContatoDto> saveMeioContato(@Valid @RequestBody MeioContatoDto meioContatoDto) {
 		return new ResponseEntity<>(pessoaService.createMeioContato(meioContatoDto), null, HttpStatus.CREATED);
+	}
+
+	@GetMapping
+	public ResponseEntity<List<PessoaDto>> findAll() {
+		return new ResponseEntity<>(pessoaService.findPessoas(), null, HttpStatus.OK);
+	}
+
+	@GetMapping("/{idPessoa}")
+	public ResponseEntity<PessoaDto> findPessoaId(@PathVariable Long idPessoa) {
+		return new ResponseEntity<>(pessoaService.findPessoaId(idPessoa), null, HttpStatus.OK);
+	}
+
+	@GetMapping("/listPessoasCondominio/{idCondominio}")
+	public ResponseEntity<List<PessoaDto>> findPessoasCondominio(@PathVariable Long idCondominio) {
+		return new ResponseEntity<>(pessoaService.findPessoasCondominioId(idCondominio), null, HttpStatus.OK);
 	}
 
 }
