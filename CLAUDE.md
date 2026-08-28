@@ -1,0 +1,98 @@
+# auto-gestao-api
+
+Backend do domínio de condomínio (Condomínio, Endereço, Pessoa, Taxa Extra, Meio de Contato).
+Este repositório é o **template arquitetural de referência**: todo novo microsserviço de
+domínio do ecossistema Gestão Condial deve copiar a estrutura, convenções e fluxo descritos
+aqui. Ver `/Users/igorlima/Documents/gestão-condial/CLAUDE.md` para a visão geral do sistema
+multi-repositório.
+
+## Stack
+
+- Java 21, Spring Boot 4.1.1, Maven.
+- PostgreSQL, Flyway (migrations versionadas — nunca `hibernate.ddl-auto=update`).
+- Lombok + MapStruct (mapeamento entidade ↔ DTO).
+- springdoc-openapi (serve o contrato em `/docs/`) + `openapi-generator-maven-plugin`
+  (gera interfaces de controller + DTOs a partir do contrato).
+- Spring Security (`oauth2-resource-server`), validando JWT emitido pelo
+  `gestao-condial-oauth-service`.
+
+## Estrutura de pacotes (package-by-layer)
+
+```
+br.com.gestaocondial.autogestao
+├── config       # SecurityConfig, GlobalExceptionHandler, etc.
+├── controller   # @RestController — implementam as interfaces geradas pelo openapi-generator
+├── domain       # entidades JPA
+├── dto          # DTOs de entrada/saída (nunca @Component/@Service — são POJOs)
+├── enumeration
+├── exception
+├── impl         # implementação real dos services (XImpl implements XService)
+├── mapper       # interfaces MapStruct (@Mapper(componentModel = "spring"))
+├── repository   # interfaces JpaRepository — sem anotações extras
+└── service      # interfaces (nunca @Service — o bean é o XImpl)
+```
+
+Decisão: manter package-by-layer (não por feature) enquanto o domínio for pequeno e
+fortemente relacionado em um único agregado de condomínio. Revisitar para package-by-feature
+se o número de agregados desacoplados crescer bastante.
+
+### Convenção de nomes
+
+- Por camada: `XController`, `XService` (interface), `XImpl` (implementação, em `impl/`),
+  `XRepository`, `XMapper`, `XDto`, `X` (entidade em `domain/`).
+- Colunas de banco prefixadas por tipo: `id_` (PK/FK), `nr_` (numérico), `vl_` (monetário),
+  `ds_` (texto descritivo), `in_` (booleano/indicador). Tabelas: `tb_*`.
+
+### Regras de implementação obrigatórias
+
+- Injeção **sempre por construtor** (`@RequiredArgsConstructor` do Lombok + campos `final`).
+  Nunca `@Autowired` em campo.
+- `@Transactional` no `XImpl` (service), nunca no controller. Métodos de escrita sem
+  `readOnly`; métodos de leitura com `@Transactional(readOnly = true)`.
+- Erros tratados centralmente em `config/GlobalExceptionHandler.java`
+  (`@RestControllerAdvice`), populando `ListaDeErrosOutputDto`/`ErroDeParametroOutputDto`.
+  Não deixar exceptions sem handler.
+- DTOs são POJOs simples — nunca anotar com `@Component`/`@Service`.
+- Repositories são só `extends JpaRepository<X, Long>` — sem `@Configuration`,
+  `@ComponentScan` ou `@EnableAutoConfiguration`.
+
+## Fluxo API-first (contract-first)
+
+1. O contrato vive em `openapi/auto-gestao-api.yaml`, na raiz do repo (fora de `src/`).
+2. `./mvnw generate-sources` roda o `openapi-generator-maven-plugin`, que gera as interfaces
+   de controller e os DTOs de request/response sob `target/generated-sources/`.
+3. As classes em `controller/` implementam essas interfaces geradas — a assinatura do endpoint
+   vem sempre do contrato, nunca o contrário.
+4. Para adicionar/alterar um endpoint: editar o YAML primeiro, rodar
+   `./mvnw generate-sources`, só então implementar/ajustar o controller.
+5. `/docs/` serve a Swagger UI apontando para o YAML (não para anotações no código —
+   `springdoc.api-docs.enabled=false`).
+
+## Banco de dados
+
+- **Base física compartilhada** com todos os microsserviços (`gestao_condial`) — o que isola
+  este serviço é o schema, nunca um banco separado. Ver
+  `/Users/igorlima/Documents/gestão-condial/infra/README.md`.
+- Schema próprio: `auto_gestao` (`spring.jpa.properties.hibernate.default_schema`,
+  `spring.flyway.schemas`).
+- Migrations em `src/main/resources/db/migration/V<n>__descricao.sql`.
+- `hibernate.ddl-auto=validate` em todos os profiles — o Flyway é o dono do schema.
+
+## Como rodar local
+
+```
+# Postgres compartilhado (Docker ou nativo local — ver infra/README.md na pasta-mãe):
+cd ../infra && docker compose up -d && cd -
+./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+```
+
+Swagger UI: `http://localhost:8080/docs`.
+
+## Como adicionar uma nova entidade de domínio
+
+Use `Condominio` como referência: `domain/Condominio.java` → `dto/CondominioDto.java` →
+`mapper/CondominioMapper.java` → `repository/CondominioRepository.java` →
+`service/CondominioService.java` (interface) → `impl/CondominioImpl.java` (implementação,
+injeção por construtor) → endpoint no `openapi/auto-gestao-api.yaml` → gerar interface →
+`controller/CondominioController.java` implementando a interface gerada → migration Flyway
+para a(s) nova(s) tabela(s).

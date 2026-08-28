@@ -1,0 +1,418 @@
+openapi: 3.0.3
+info:
+  title: auto-gestao-api
+  description: >
+    Backend do domínio de condomínio (Condomínio, Endereço, Pessoa, Taxa Extra,
+    Meio de Contato) do ecossistema Gestão Condial. Contrato contract-first:
+    este arquivo é a fonte da verdade dos endpoints; as interfaces de
+    controller e os modelos são gerados a partir dele pelo
+    openapi-generator-maven-plugin.
+  version: "1.0.0"
+servers:
+  - url: /
+tags:
+  - name: Condominio
+    description: Operações sobre condomínios e suas taxas extras.
+  - name: Endereco
+    description: Operações sobre endereços.
+  - name: Pessoa
+    description: Operações sobre pessoas (moradores) e seus meios de contato.
+paths:
+  /condominio:
+    get:
+      tags: [Condominio]
+      operationId: listCondominios
+      summary: Lista todos os condomínios cadastrados.
+      responses:
+        "200":
+          description: Lista de condomínios.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Condominio"
+    post:
+      tags: [Condominio]
+      operationId: createCondominio
+      summary: Cria um novo condomínio.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Condominio"
+      responses:
+        "201":
+          description: Condomínio criado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Condominio"
+        "400":
+          description: Erro de validação dos parâmetros enviados.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListaDeErros"
+        "404":
+          description: Endereço informado não encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListaDeErros"
+  /condominio/{idCondominio}:
+    get:
+      tags: [Condominio]
+      operationId: findCondominio
+      summary: Busca um condomínio pelo id.
+      parameters:
+        - name: idCondominio
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Condomínio encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Condominio"
+  /condominio/taxaExtra:
+    post:
+      tags: [Condominio]
+      operationId: createTaxaExtra
+      summary: Cria uma taxa extra para um condomínio.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaxaExtra"
+      responses:
+        "201":
+          description: Taxa extra criada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaxaExtra"
+        "400":
+          description: Erro de validação dos parâmetros enviados.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListaDeErros"
+  /condominio/taxaExtraPorCondominio/{idCondominio}:
+    get:
+      tags: [Condominio]
+      operationId: findTaxaExtraCondominio
+      summary: Lista as taxas extras de um condomínio.
+      parameters:
+        - name: idCondominio
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Lista de taxas extras do condomínio.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TaxaExtra"
+  /endereco:
+    get:
+      tags: [Endereco]
+      operationId: findEndereco
+      summary: Lista todos os endereços cadastrados.
+      responses:
+        "200":
+          description: Lista de endereços.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Endereco"
+    post:
+      tags: [Endereco]
+      operationId: saveEndereco
+      summary: Cria um novo endereço.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Endereco"
+      responses:
+        "201":
+          description: Endereço criado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Endereco"
+        "400":
+          description: Erro de validação dos parâmetros enviados.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListaDeErros"
+  /pessoa:
+    get:
+      tags: [Pessoa]
+      operationId: findAll
+      summary: Lista todas as pessoas cadastradas.
+      responses:
+        "200":
+          description: Lista de pessoas.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Pessoa"
+    post:
+      tags: [Pessoa]
+      operationId: savePessoa
+      summary: Cria uma nova pessoa.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Pessoa"
+      responses:
+        "201":
+          description: Pessoa criada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pessoa"
+        "400":
+          description: Erro de validação dos parâmetros enviados.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListaDeErros"
+  /pessoa/{idPessoa}:
+    get:
+      tags: [Pessoa]
+      operationId: findPessoaId
+      summary: Busca uma pessoa pelo id.
+      parameters:
+        - name: idPessoa
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Pessoa encontrada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pessoa"
+  /pessoa/findEnvioPorEmailPorCondominio/{id}:
+    get:
+      tags: [Pessoa]
+      operationId: findEnvioPorEmailPorCondominio
+      summary: Lista as pessoas de um condomínio que recebem taxa por e-mail.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Lista de pessoas com envio de taxa por e-mail habilitado.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Pessoa"
+  /pessoa/listPessoasCondominio/{idCondominio}:
+    get:
+      tags: [Pessoa]
+      operationId: findPessoasCondominio
+      summary: Lista as pessoas de um condomínio.
+      parameters:
+        - name: idCondominio
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Lista de pessoas do condomínio.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Pessoa"
+  /pessoa/meioContatoPessoa:
+    post:
+      tags: [Pessoa]
+      operationId: saveMeioContato
+      summary: Cria um meio de contato para uma pessoa.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MeioContato"
+      responses:
+        "201":
+          description: Meio de contato criado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeioContato"
+        "400":
+          description: Erro de validação dos parâmetros enviados.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListaDeErros"
+components:
+  schemas:
+    Condominio:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          readOnly: true
+        ddd:
+          type: integer
+          format: int32
+        numeroTelefone:
+          type: integer
+          format: int64
+        endereco:
+          $ref: "#/components/schemas/Endereco"
+        valorJuros:
+          type: number
+          format: double
+        valorMulta:
+          type: number
+          format: double
+        possuiTaxaExtra:
+          type: boolean
+          default: false
+        valorTaxaCondominial:
+          type: number
+          format: double
+        valorTaxasExtras:
+          type: number
+          format: double
+          readOnly: true
+          description: Somatório das taxas extras vigentes, calculado pelo servidor.
+        valorTotalPorUnidade:
+          type: number
+          format: double
+          readOnly: true
+          description: Valor final por unidade (taxa condominial + taxas extras), calculado pelo servidor.
+    Endereco:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          readOnly: true
+        cep:
+          type: integer
+          format: int64
+        endereco:
+          type: string
+        complemento:
+          type: string
+    Pessoa:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          readOnly: true
+        nomeCompleto:
+          type: string
+        numeroUnidade:
+          type: integer
+          format: int64
+        envioTaxaEmail:
+          type: boolean
+        envioImpresso:
+          type: boolean
+        isSindico:
+          type: boolean
+        condominio:
+          $ref: "#/components/schemas/Condominio"
+        endereco:
+          $ref: "#/components/schemas/Endereco"
+        cpf:
+          type: string
+          description: CPF da pessoa (validado no servidor).
+    MeioContato:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          readOnly: true
+        pessoa:
+          $ref: "#/components/schemas/Pessoa"
+        tipoMeioContato:
+          type: string
+          enum:
+            - EMAIL
+            - TELEF
+        identificacao:
+          type: string
+    TaxaExtra:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          readOnly: true
+        condominio:
+          $ref: "#/components/schemas/Condominio"
+        valorTaxaExtra:
+          type: number
+          format: double
+        numeroParcelas:
+          type: integer
+          format: int32
+        descricaoTaxa:
+          type: string
+        dataCadastro:
+          type: string
+          format: date-time
+    ErroDeParametro:
+      type: object
+      properties:
+        parametro:
+          type: string
+        mensagem:
+          type: string
+    ListaDeErros:
+      type: object
+      properties:
+        erros:
+          type: array
+          items:
+            $ref: "#/components/schemas/ErroDeParametro"
+        quantidadeDeErros:
+          type: integer
+          format: int32
+          readOnly: true
