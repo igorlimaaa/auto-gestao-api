@@ -13,6 +13,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+
 @SpringBootTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ActiveProfiles(value = "test")
@@ -45,8 +48,16 @@ class CondominioControllerTest {
 				+ "  \"valorTaxaCondominial\": 500.0\n"
 				+ "}";
 
+		// @EnableWebSecurity tambem vale no profile "test", e nenhum dos
+		// SecurityFilterChain declarados casa com ele (sao @Profile("dev") e
+		// @Profile("prod")), entao vale a cadeia padrao do Spring Security:
+		// exige requisicao autenticada e token CSRF no POST. Sem os dois
+		// post-processors abaixo a requisicao e barrada com 403 antes de chegar
+		// ao controller, e o teste nunca chega a exercitar o 404.
 		mockmvc.perform(MockMvcRequestBuilders
 				.post(URI)
+				.with(jwt())
+				.with(csrf())
 				.content(json)
 				.contentType(MediaType.APPLICATION_JSON))
 		.andExpect(MockMvcResultMatchers

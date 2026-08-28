@@ -1,0 +1,197 @@
+name: Deploy
+
+# Todo push na branch de produção dispara o pipeline. paths-ignore evita
+# rebuildar a imagem por causa de mudança só em documentação.
+on:
+  push:
+    branches: [master, main]
+    paths-ignore:
+      - "**.md"
+      - ".gitignore"
+      - "LICENSE"
+  workflow_dispatch:
+
+# Se chegarem dois pushes seguidos, cancela o deploy antigo em andamento —
+# não faz sentido publicar uma versão que já foi superada.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+  COMPOSE_SERVICE: api-service
+  APP_DIR: /opt/gestao-condial
+  TAG_VAR: API_TAG
+
+jobs:
+  # Roda em paralelo com o build. Como os dois jobs começam juntos, o tempo de
+  # parede do pipeline é o do mais lento, não a soma dos dois.
+  test:
+    name: Testes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      # O .mvn/maven.config destes repositórios passa `-s ../settings.xml`, e esse
+      # arquivo mora na pasta-container do workspace, FORA do repositório — o
+      # actions/checkout nunca o traz. Sem isso o Maven aborta com
+      # "The specified user settings file does not exist".
+      # O settings original só força o Maven Central (contorno para o
+      # ~/.m2/settings.xml da máquina do dev, que aponta para o Nexus do CNJ).
+      # No runner limpo esse conflito não existe, então um equivalente basta.
+      - name: Prover o ../settings.xml exigido pelo .mvn/maven.config
+        run: |
+          cat > "$GITHUB_WORKSPACE/../settings.xml" <<'XML'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0">
+            <profiles>
+              <profile>
+                <id>gestao-condial-central</id>
+                <repositories>
+                  <repository>
+                    <id>central</id>
+                    <url>https://repo.maven.apache.org/maven2</url>
+                    <releases><enabled>true</enabled></releases>
+                    <snapshots><enabled>false</enabled></snapshots>
+                  </repository>
+                </repositories>
+                <pluginRepositories>
+                  <pluginRepository>
+                    <id>central</id>
+                    <url>https://repo.maven.apache.org/maven2</url>
+                    <releases><enabled>true</enabled></releases>
+                    <snapshots><enabled>false</enabled></snapshots>
+                  </pluginRepository>
+                </pluginRepositories>
+              </profile>
+            </profiles>
+            <activeProfiles>
+              <activeProfile>gestao-condial-central</activeProfile>
+            </activeProfiles>
+          </settings>
+          XML
+
+      - name: Rodar testes
+        run: ./mvnw -B verify
+
+  build:
+    name: Build e push da imagem
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build e push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          # Só amd64 (arquitetura da VPS). O runner do GitHub também é amd64,
+          # então o build é nativo — sem a emulação QEMU que tornava o build
+          # local no Mac (arm64) várias vezes mais lento.
+          platforms: linux/amd64
+          push: true
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}
+          # Cache de camadas entre execuções: se o pom.xml não mudou, a camada
+          # de download das dependências é reaproveitada e o Maven nem roda.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          # Sem manifesto de attestation: mantém a imagem como um manifesto
+          # simples, que é o que o `docker compose pull` da VPS espera.
+          provenance: false
+
+  deploy:
+    name: Deploy na VPS
+    permissions:
+      contents: read
+      packages: read
+    needs: [test, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configurar chave SSH
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Puxar imagem e reiniciar o serviço
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          # Token efêmero: vale só enquanto este job roda e só dá acesso aos
+          # pacotes deste repositório. Nada de credencial fixa na VPS.
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+        run: |
+          ssh -i ~/.ssh/deploy_key "$VPS_USER@$VPS_HOST" \
+            "APP_DIR='${{ env.APP_DIR }}' SVC='${{ env.COMPOSE_SERVICE }}' \
+             TAG_VAR='${{ env.TAG_VAR }}' SHA='${{ github.sha }}' \
+             GHCR_TOKEN='$GHCR_TOKEN' GHCR_USER='$GHCR_USER' bash -euo pipefail -s" <<'REMOTE'
+          cd "$APP_DIR"
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+
+          # Deploy determinístico: aponta o serviço para a tag do SHA exato que
+          # este run buildou, em vez de confiar em `latest`. Isso também apaga
+          # um pin deixado por um rollback anterior — sem isso o CI puxaria a
+          # versão antiga e o deploy passaria "verde" sem publicar nada.
+          sed -i "/^${TAG_VAR}=/d" .env
+          # Garante quebra de linha no fim antes de concatenar, senão a tag
+          # gruda na última variável do arquivo.
+          [ -s .env ] && [ -n "$(tail -c1 .env)" ] && echo >> .env
+          echo "${TAG_VAR}=${SHA}" >> .env
+
+          # Puxa só as camadas que mudaram. Num commit que mexe apenas em
+          # código, isso é a camada de aplicação (~500 KB) — as dependências
+          # (~62 MB) já estão na VPS desde o deploy anterior.
+          docker compose -f docker-compose.prod.yml pull "$SVC"
+
+          # --no-deps: sobe só este serviço, sem reiniciar Postgres e Traefik.
+          docker compose -f docker-compose.prod.yml up -d --no-deps "$SVC"
+
+          docker image prune -f
+          docker logout ghcr.io
+          REMOTE
+
+      - name: Verificar saúde do serviço
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          ssh -i ~/.ssh/deploy_key "$VPS_USER@$VPS_HOST" \
+            "APP_DIR='${{ env.APP_DIR }}' SVC='${{ env.COMPOSE_SERVICE }}' bash -euo pipefail -s" <<'REMOTE'
+          cd "$APP_DIR"
+          for i in $(seq 1 30); do
+            if docker compose -f docker-compose.prod.yml exec -T "$SVC" \
+                 sh -c 'wget -qO- http://localhost:8080/actuator/health' 2>/dev/null | grep -q '"status":"UP"'; then
+              echo "Serviço no ar."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Serviço não respondeu UP em 150s. Últimos logs:" >&2
+          docker compose -f docker-compose.prod.yml logs --tail=50 "$SVC" >&2
+          exit 1
+          REMOTE

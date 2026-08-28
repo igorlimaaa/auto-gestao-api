@@ -41,6 +41,17 @@
 			<artifactId>spring-boot-starter-webmvc-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<!-- Post-processors do MockMvc para autenticar requisicoes de teste
+			(SecurityMockMvcRequestPostProcessors.jwt()/csrf()). Necessario porque
+			@EnableWebSecurity vale tambem no profile "test": sem nenhum
+			SecurityFilterChain casando com esse profile (os beans existentes sao
+			@Profile("dev") e @Profile("prod")), o Spring Security aplica a cadeia
+			padrao, que exige autenticacao e token CSRF em qualquer POST. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security-test</artifactId>
+			<scope>test</scope>
+		</dependency>
 		<!-- Idem para @DataJpaTest / @AutoConfigureTestEntityManager. -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
