@@ -56,6 +56,33 @@ se o número de agregados desacoplados crescer bastante.
 - Repositories são só `extends JpaRepository<X, Long>` — sem `@Configuration`,
   `@ComponentScan` ou `@EnableAutoConfiguration`.
 
+## Segurança
+
+Todo endpoint de domínio exige um JWT de acesso válido emitido pelo
+`gestao-condial-oauth-service`. Só `/docs/**`, `/openapi/**`, `/actuator/health` e `/error`
+ficam abertos — o último porque o job de deploy usa o health check para confirmar que o serviço
+subiu.
+
+- **A cadeia é a mesma em dev e prod** (`SecurityConfig`, `@Profile("!test")`). O profile dev já
+  foi `permitAll()` em tudo; o efeito era o comportamento de autenticação só aparecer em
+  produção. Para exercitar a API localmente, pegue um token em
+  `POST http://localhost:8081/auth/login`.
+- **`jwk-set-uri`, não só `issuer-uri`**: com `issuer-uri` sozinho o Spring faz OpenID Discovery
+  na criação do bean, o que obrigaria o oauth-service a estar no ar quando este serviço sobe. O
+  `issuer-uri` continua configurado porque é ele que faz validar o claim `iss`.
+- **`ValidadorDeEscopoDeAcesso`**: o oauth-service emite dois tipos de token com a mesma chave e
+  o mesmo issuer — o de acesso e o de seleção de perfil. Só o claim `escopo` os separa; sem esse
+  validador, um token de seleção passaria por `authenticated()`.
+- **`ConversorDeAutoridadesDoJwt`**: `papeis` viram `ROLE_<CODIGO>` (para `hasRole`) e
+  `permissoes` viram authorities de mesmo nome (para `hasAuthority`). Nenhum endpoint usa isso
+  ainda — hoje todos exigem apenas autenticação.
+- **`RespostaDeErroDeSeguranca`**: 401/403 saem no mesmo envelope `ListaDeErrosOutputDto` do
+  `GlobalExceptionHandler`, e não com o corpo vazio padrão do Spring Security. É o 401 em JSON
+  que o frontend usa como gatilho para levar o usuário de volta ao login.
+- `ClaimsDoToken` é uma cópia deliberada da classe homônima do oauth-service: os serviços não
+  compartilham biblioteca — o contrato entre eles é o próprio token. Mudar um nome de claim
+  exige mudar nos dois.
+
 ## Fluxo API-first (contract-first)
 
 1. O contrato vive em `openapi/auto-gestao-api.yaml`, na raiz do repo (fora de `src/`).

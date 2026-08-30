@@ -1,6 +1,7 @@
 package br.com.gestaocondial.autogestao.impl;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 import org.springframework.stereotype.Service;
@@ -98,17 +99,21 @@ public class CondominioImpl implements CondominioService {
 	}
 
 	private CondominioDto preencherValorTaxasExtras(CondominioDto condominioDto, List<TaxaExtra> listTaxaExtra) {
-		if (condominioDto.getPossuiTaxaExtra()) {
-			listTaxaExtra.stream().filter(listTaxa -> condominioDto.getId() == listTaxa.getCondominio().getId())
-					.forEach(condDto -> {
-						Double valor = condominioDto.getValorTaxasExtras() != null
-								? condominioDto.getValorTaxasExtras()
-								: DOUBLE_ZERO;
-						valor += condDto.getValorTaxaExtra();
+		// Zera antes de somar mesmo quando possuiTaxaExtra e true: um condominio marcado como
+		// tendo taxa extra mas sem nenhuma taxa cadastrada deixava o valor nulo, e o calculo do
+		// valor final estourava NullPointerException.
+		condominioDto.setValorTaxasExtras(DOUBLE_ZERO);
+
+		if (Boolean.TRUE.equals(condominioDto.getPossuiTaxaExtra())) {
+			listTaxaExtra.stream()
+					// Objects.equals, nao ==: comparar dois Long por identidade so funciona por
+					// acidente ate 127 (cache de boxing) e devolve falso a partir dai, somando
+					// taxa extra de menos sem erro nenhum.
+					.filter(taxa -> Objects.equals(condominioDto.getId(), taxa.getCondominio().getId()))
+					.forEach(taxa -> {
+						Double valor = condominioDto.getValorTaxasExtras() + taxa.getValorTaxaExtra();
 						condominioDto.setValorTaxasExtras(valor);
 					});
-		} else {
-			condominioDto.setValorTaxasExtras(DOUBLE_ZERO);
 		}
 		return condominioDto;
 	}
@@ -121,11 +126,14 @@ public class CondominioImpl implements CondominioService {
 	}
 
 	private CondominioDto preencherValorFinal(CondominioDto condDto) {
-		if (condDto.getPossuiTaxaExtra()) {
-			condDto.setValorTotalPorUnidade(condDto.getValorTaxasExtras() + condDto.getValorTaxaCondominial());
-		} else {
-			condDto.setValorTotalPorUnidade(condDto.getValorTaxaCondominial());
-		}
+		Double taxaCondominial = condDto.getValorTaxaCondominial() != null
+				? condDto.getValorTaxaCondominial()
+				: DOUBLE_ZERO;
+		Double taxasExtras = Boolean.TRUE.equals(condDto.getPossuiTaxaExtra()) && condDto.getValorTaxasExtras() != null
+				? condDto.getValorTaxasExtras()
+				: DOUBLE_ZERO;
+
+		condDto.setValorTotalPorUnidade(taxaCondominial + taxasExtras);
 		return condDto;
 	}
 
