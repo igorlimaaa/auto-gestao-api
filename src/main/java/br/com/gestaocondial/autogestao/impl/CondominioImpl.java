@@ -12,6 +12,11 @@ import br.com.gestaocondial.autogestao.domain.Endereco;
 import br.com.gestaocondial.autogestao.domain.TaxaExtra;
 import br.com.gestaocondial.autogestao.dto.CondominioDto;
 import br.com.gestaocondial.autogestao.dto.TaxaExtraDto;
+import br.com.gestaocondial.autogestao.exception.CondominioNaoEncontradoException;
+import br.com.gestaocondial.autogestao.exception.TaxaExtraNaoEncontradaException;
+import br.com.gestaocondial.autogestao.exception.RecursoEmUsoException;
+import br.com.gestaocondial.autogestao.repository.UnidadeRepository;
+import br.com.gestaocondial.autogestao.repository.PessoaRepository;
 import br.com.gestaocondial.autogestao.exception.EnderecoNaoEncontradoException;
 import br.com.gestaocondial.autogestao.mapper.CondominioMapper;
 import br.com.gestaocondial.autogestao.mapper.TaxaExtraMapper;
@@ -28,6 +33,10 @@ public class CondominioImpl implements CondominioService {
 	private static final Double DOUBLE_ZERO = 0.00;
 
 	private final CondominioRepository condominioRepository;
+
+	private final UnidadeRepository unidadeRepository;
+
+	private final PessoaRepository pessoaRepository;
 
 	private final EnderecoRepository enderecoRepository;
 
@@ -64,6 +73,94 @@ public class CondominioImpl implements CondominioService {
 		Optional<Endereco> enderecoDomain = enderecoRepository.findById(condominoDomain.getEndereco().getId());
 		condominoDomain.setEndereco(enderecoDomain.get());
 		return mapper.condominioDomainToDto(condominoDomain);
+	}
+
+	@Override
+	@Transactional
+	public CondominioDto updateCondominio(Long idCondominio, CondominioDto condominioDto) {
+		Condominio condominio = condominioPorId(idCondominio);
+
+		if (condominioDto.getEndereco() != null && condominioDto.getEndereco().getId() != null) {
+			Long idEndereco = condominioDto.getEndereco().getId();
+			Endereco endereco = enderecoRepository.findById(idEndereco)
+					.orElseThrow(() -> new EnderecoNaoEncontradoException(
+							"Endereco id \"" + idEndereco + "\" nao encontrado ou nao existe"));
+			condominio.setEndereco(endereco);
+		}
+
+		condominioDto = validarMultaEjuros(condominioDto);
+		condominio.setDdd(condominioDto.getDdd() == null ? null : condominioDto.getDdd().longValue());
+		condominio.setNumeroTelefone(condominioDto.getNumeroTelefone());
+		condominio.setValorTaxaCondominial(condominioDto.getValorTaxaCondominial());
+		condominio.setValorJuros(condominioDto.getValorJuros());
+		condominio.setValorMulta(condominioDto.getValorMulta());
+
+		condominio = condominioRepository.save(condominio);
+
+		CondominioDto salvo = mapper.condominioDomainToDto(condominio);
+		preencherValorTaxasExtras(salvo, taxaRepository.findAllByCondominioId(idCondominio));
+		return preencherValorFinal(salvo);
+	}
+
+	/**
+	 * Exclusao recusada enquanto houver unidade, morador ou taxa vinculados. Apagar em cascata
+	 * levaria junto o cadastro de quem mora la, sem deixar rastro do porque.
+	 */
+	@Override
+	@Transactional
+	public void deleteCondominio(Long idCondominio) {
+		Condominio condominio = condominioPorId(idCondominio);
+
+		long unidades = unidadeRepository.countByCondominioId(idCondominio);
+		long moradores = pessoaRepository.countByCondominioId(idCondominio);
+		long taxas = taxaRepository.countByCondominioId(idCondominio);
+
+		if (unidades + moradores + taxas > 0) {
+			throw new RecursoEmUsoException("O condominio ainda tem " + unidades + " unidade(s), " + moradores
+					+ " morador(es) e " + taxas + " taxa(s) vinculados. Remova esses registros antes de exclui-lo.");
+		}
+
+		condominioRepository.delete(condominio);
+	}
+
+	@Override
+	@Transactional
+	public TaxaExtraDto updateTaxaExtra(Long idTaxaExtra, TaxaExtraDto taxaDto) {
+		TaxaExtra taxa = taxaRepository.findById(idTaxaExtra)
+				.orElseThrow(() -> new TaxaExtraNaoEncontradaException(
+						"Taxa extra " + idTaxaExtra + " nao encontrada."));
+
+		taxa.setValorTaxaExtra(taxaDto.getValorTaxaExtra());
+		taxa.setNumeroParcelas(taxaDto.getNumeroParcelas());
+		taxa.setDescricaoTaxa(taxaDto.getDescricaoTaxa());
+
+		return mapperTaxa.taxaExtraDomainToDto(taxaRepository.save(taxa));
+	}
+
+	@Override
+	@Transactional
+	public void deleteTaxaExtra(Long idTaxaExtra) {
+		TaxaExtra taxa = taxaRepository.findById(idTaxaExtra)
+				.orElseThrow(() -> new TaxaExtraNaoEncontradaException(
+						"Taxa extra " + idTaxaExtra + " nao encontrada."));
+
+		Long idCondominio = taxa.getCondominio().getId();
+		taxaRepository.delete(taxa);
+
+		// Sem isso o condominio continuaria marcado como "possui taxa extra" tendo zero taxas,
+		// e o calculo do valor final somaria um extra que nao existe mais.
+		if (taxaRepository.countByCondominioId(idCondominio) == 0) {
+			condominioRepository.findById(idCondominio).ifPresent(condominio -> {
+				condominio.setPossuiTaxaExtra(false);
+				condominioRepository.save(condominio);
+			});
+		}
+	}
+
+	private Condominio condominioPorId(Long idCondominio) {
+		return condominioRepository.findById(idCondominio)
+				.orElseThrow(() -> new CondominioNaoEncontradoException(
+						"Condominio " + idCondominio + " nao encontrado."));
 	}
 
 	private CondominioDto validarMultaEjuros(CondominioDto condominioDTo) {
@@ -140,15 +237,16 @@ public class CondominioImpl implements CondominioService {
 	@Override
 	@Transactional(readOnly = true)
 	public List<TaxaExtraDto> listTaxaExtra(Long idCondominio) {
-		List<TaxaExtra> listTaxaExtra = taxaRepository.findAllByCondominioId(idCondominio);
-		if (!listTaxaExtra.isEmpty() && listTaxaExtra != null) {
-			List<TaxaExtraDto> listTaxaExtraDomainToDto = mapperTaxa.listTaxaExtraDomainToDto(listTaxaExtra);
-			for (TaxaExtraDto forList : listTaxaExtraDomainToDto) {
-				forList.setCondominio(null);
-			}
-			return listTaxaExtraDomainToDto;
-		}
-		return null;
+		// idCondominio nulo = todas as taxas. Antes, o metodo so aceitava um id, e chamar sem
+		// filtro devolvia lista vazia — o que impedia a listagem global.
+		List<TaxaExtra> listTaxaExtra = idCondominio == null
+				? taxaRepository.findAll()
+				: taxaRepository.findAllByCondominioId(idCondominio);
+
+		// O condominio permanece no DTO: a listagem global precisa dizer a que condominio cada
+		// taxa pertence. Lista vazia sai como [], nunca null — null vira corpo vazio no HTTP,
+		// que o cliente nao consegue distinguir de uma falha.
+		return mapperTaxa.listTaxaExtraDomainToDto(listTaxaExtra);
 	}
 
 	@Override

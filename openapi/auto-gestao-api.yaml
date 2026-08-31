@@ -17,6 +17,10 @@ tags:
     description: Operações sobre endereços.
   - name: Pessoa
     description: Operações sobre pessoas (moradores) e seus meios de contato.
+  - name: Unidade
+    description: >
+      Operações sobre unidades autônomas (apartamento, sala, loja). Uma unidade existe por si
+      só: pode ser cadastrada vazia, e o morador é ligado a ela depois — ou nunca.
 paths:
   /condominio:
     get:
@@ -80,7 +84,79 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Condominio"
+    put:
+      tags: [Condominio]
+      operationId: updateCondominio
+      summary: Atualiza um condomínio.
+      description: Exige a permissão `CONDOMINIO_ESCREVER`.
+      parameters:
+        - name: idCondominio
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Condominio"
+      responses:
+        "200":
+          description: Condomínio atualizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Condominio"
+        "400":
+          $ref: "#/components/responses/DadosInvalidos"
+        "404":
+          $ref: "#/components/responses/NaoEncontrado"
+    delete:
+      tags: [Condominio]
+      operationId: deleteCondominio
+      summary: Exclui um condomínio.
+      description: >
+        Exige a permissão `CONDOMINIO_ESCREVER`. Recusa com 409 se ainda houver unidades,
+        moradores ou taxas vinculados — apagar em cascata levaria junto o cadastro de gente que
+        mora lá.
+      parameters:
+        - name: idCondominio
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Condomínio excluído.
+        "404":
+          $ref: "#/components/responses/NaoEncontrado"
+        "409":
+          $ref: "#/components/responses/EmUso"
   /condominio/taxaExtra:
+    get:
+      tags: [Condominio]
+      operationId: listTaxasExtras
+      summary: Lista as taxas extras.
+      description: Exige a permissão `TAXA_LER`.
+      parameters:
+        - name: idCondominio
+          in: query
+          description: Restringe a um condomínio.
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Taxas extras.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TaxaExtra"
     post:
       tags: [Condominio]
       operationId: createTaxaExtra
@@ -104,6 +180,56 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ListaDeErros"
+  /condominio/taxaExtra/{idTaxaExtra}:
+    put:
+      tags: [Condominio]
+      operationId: updateTaxaExtra
+      summary: Atualiza uma taxa extra.
+      description: Exige a permissão `TAXA_ESCREVER`.
+      parameters:
+        - name: idTaxaExtra
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaxaExtra"
+      responses:
+        "200":
+          description: Taxa atualizada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaxaExtra"
+        "400":
+          $ref: "#/components/responses/DadosInvalidos"
+        "404":
+          $ref: "#/components/responses/NaoEncontrado"
+    delete:
+      tags: [Condominio]
+      operationId: deleteTaxaExtra
+      summary: Exclui uma taxa extra.
+      description: >
+        Exige a permissão `TAXA_ESCREVER`. Se for a última taxa do condomínio, o indicador
+        `possuiTaxaExtra` volta para falso — do contrário o condomínio ficaria marcado como
+        tendo taxa extra sem ter nenhuma.
+      parameters:
+        - name: idTaxaExtra
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Taxa excluída.
+        "404":
+          $ref: "#/components/responses/NaoEncontrado"
   /condominio/taxaExtraPorCondominio/{idCondominio}:
     get:
       tags: [Condominio]
@@ -166,6 +292,29 @@ paths:
     get:
       tags: [Pessoa]
       operationId: findAll
+      parameters:
+        - name: idCondominio
+          in: query
+          description: Restringe a um condomínio.
+          schema:
+            type: integer
+            format: int64
+        - name: idUnidade
+          in: query
+          description: Restringe a uma unidade.
+          schema:
+            type: integer
+            format: int64
+        - name: semUnidade
+          in: query
+          description: Quando verdadeiro, traz só os moradores ainda não vinculados a uma unidade.
+          schema:
+            type: boolean
+        - name: busca
+          in: query
+          description: Texto livre; casa com nome e CPF.
+          schema:
+            type: string
       summary: Lista todas as pessoas cadastradas.
       responses:
         "200":
@@ -218,6 +367,54 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Pessoa"
+    put:
+      tags: [Pessoa]
+      operationId: updatePessoa
+      summary: Atualiza um morador.
+      description: >
+        Exige a permissão `MORADOR_ESCREVER`. Para desvincular o morador da unidade, envie
+        `unidade` nulo.
+      parameters:
+        - name: idPessoa
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Pessoa"
+      responses:
+        "200":
+          description: Morador atualizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pessoa"
+        "400":
+          $ref: "#/components/responses/DadosInvalidos"
+        "404":
+          $ref: "#/components/responses/NaoEncontrado"
+    delete:
+      tags: [Pessoa]
+      operationId: deletePessoa
+      summary: Exclui um morador.
+      description: Exige a permissão `MORADOR_ESCREVER`. Os meios de contato dele vão junto.
+      parameters:
+        - name: idPessoa
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Morador excluído.
+        "404":
+          $ref: "#/components/responses/NaoEncontrado"
   /pessoa/findEnvioPorEmailPorCondominio/{id}:
     get:
       tags: [Pessoa]
@@ -284,8 +481,208 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ListaDeErros"
+  /unidade:
+    get:
+      tags: [Unidade]
+      operationId: listUnidades
+      summary: Lista as unidades.
+      description: Exige a permissão `UNIDADE_LER`.
+      parameters:
+        - name: idCondominio
+          in: query
+          description: Restringe a um condomínio.
+          schema:
+            type: integer
+            format: int64
+        - name: ativa
+          in: query
+          schema:
+            type: boolean
+        - name: busca
+          in: query
+          description: Texto livre; casa com bloco e número.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Unidades encontradas.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Unidade"
+    post:
+      tags: [Unidade]
+      operationId: createUnidade
+      summary: Cadastra uma unidade.
+      description: >
+        Exige a permissão `UNIDADE_ESCREVER`. A unidade nasce sem morador — vincular alguém é um
+        passo separado, feito pelo cadastro do morador.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Unidade"
+      responses:
+        "201":
+          description: Unidade criada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Unidade"
+        "400":
+          $ref: "#/components/responses/DadosInvalidos"
+        "409":
+          description: Já existe uma unidade com esse bloco e número no condomínio.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListaDeErros"
+  /unidade/{idUnidade}:
+    get:
+      tags: [Unidade]
+      operationId: findUnidade
+      summary: Busca uma unidade pelo id.
+      description: Exige a permissão `UNIDADE_LER`.
+      parameters:
+        - name: idUnidade
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Unidade encontrada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Unidade"
+        "404":
+          $ref: "#/components/responses/NaoEncontrado"
+    put:
+      tags: [Unidade]
+      operationId: updateUnidade
+      summary: Atualiza uma unidade.
+      description: Exige a permissão `UNIDADE_ESCREVER`.
+      parameters:
+        - name: idUnidade
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Unidade"
+      responses:
+        "200":
+          description: Unidade atualizada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Unidade"
+        "400":
+          $ref: "#/components/responses/DadosInvalidos"
+        "404":
+          $ref: "#/components/responses/NaoEncontrado"
+        "409":
+          description: Já existe outra unidade com esse bloco e número no condomínio.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListaDeErros"
+    delete:
+      tags: [Unidade]
+      operationId: deleteUnidade
+      summary: Exclui uma unidade.
+      description: >
+        Exige a permissão `UNIDADE_ESCREVER`. Recusa com 409 se houver morador vinculado —
+        desvincule antes, para que a remoção seja uma decisão explícita e não um efeito colateral.
+      parameters:
+        - name: idUnidade
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Unidade excluída.
+        "404":
+          $ref: "#/components/responses/NaoEncontrado"
+        "409":
+          $ref: "#/components/responses/EmUso"
 components:
+  responses:
+    DadosInvalidos:
+      description: Dados inválidos.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ListaDeErros"
+    NaoEncontrado:
+      description: Recurso não encontrado.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ListaDeErros"
+    EmUso:
+      description: O recurso ainda está vinculado a outros registros.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ListaDeErros"
   schemas:
+    Unidade:
+      type: object
+      description: >
+        Unidade autônoma de um condomínio. Existe independentemente de haver morador: o vínculo
+        com uma Pessoa é opcional nos dois sentidos.
+
+        Sem `required` de propósito: este mesmo schema aparece aninhado em `Pessoa.unidade`,
+        onde serve só para referenciar a unidade pelo `id`. Exigir `numero` e `condominio` aqui
+        rejeitaria `{"unidade": {"id": 7}}` na hora de vincular um morador. A obrigatoriedade
+        vale na criação da unidade e é aplicada no `UnidadeDto`.
+      properties:
+        id:
+          type: integer
+          format: int64
+          readOnly: true
+        condominio:
+          $ref: "#/components/schemas/Condominio"
+        bloco:
+          type: string
+          maxLength: 30
+          description: Opcional — condomínios de bloco único não usam.
+        numero:
+          type: string
+          maxLength: 20
+          description: Identificação da unidade. Texto, não número — "101", "A-3" e "Loja 2" valem.
+        andar:
+          type: integer
+          format: int32
+        fracaoIdeal:
+          type: number
+          format: double
+          description: Participação da unidade no rateio das despesas.
+        observacao:
+          type: string
+          maxLength: 300
+        ativa:
+          type: boolean
+          default: true
+        quantidadeDeMoradores:
+          type: integer
+          format: int32
+          readOnly: true
+          description: Quantos moradores estão vinculados. Zero é condição para poder excluir.
+
     Condominio:
       type: object
       properties:
@@ -346,9 +743,12 @@ components:
           readOnly: true
         nomeCompleto:
           type: string
-        numeroUnidade:
-          type: integer
-          format: int64
+        unidade:
+          allOf:
+            - $ref: "#/components/schemas/Unidade"
+          description: >
+            Unidade onde a pessoa mora. Nulo é válido — um morador pode ser cadastrado antes de
+            se saber onde vai morar. Para vincular, basta enviar o objeto com o `id`.
         envioTaxaEmail:
           type: boolean
         envioImpresso:

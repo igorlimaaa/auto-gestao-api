@@ -15,7 +15,11 @@ public class PessoaDto {
 
 	private Long id;
 	private String nomeCompleto;
-	private Long numeroUnidade;
+	/**
+	 * Unidade onde a pessoa mora. Nulo é válido: o cadastro de morador e o de unidade são
+	 * independentes, e o vínculo pode ser feito depois — ou nunca.
+	 */
+	private UnidadeDto unidade;
 	private Boolean envioTaxaEmail;
 	private Boolean envioImpresso;
 	private Boolean isSindico;

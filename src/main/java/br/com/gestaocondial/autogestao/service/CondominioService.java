@@ -21,4 +21,12 @@ public interface CondominioService {
 
 	public List<TaxaExtraDto> listTaxaExtra(Long idCondominio);
 
+	public CondominioDto updateCondominio(Long idCondominio, CondominioDto condominio);
+
+	public void deleteCondominio(Long idCondominio);
+
+	public TaxaExtraDto updateTaxaExtra(Long idTaxaExtra, TaxaExtraDto taxa);
+
+	public void deleteTaxaExtra(Long idTaxaExtra);
+
 }

@@ -10,4 +10,6 @@ public interface TaxaExtraRepository extends JpaRepository<TaxaExtra, Long> {
 
 	List<TaxaExtra> findAllByCondominioId(Long condominioId);
 
+	long countByCondominioId(Long condominioId);
+
 }

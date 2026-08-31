@@ -34,8 +34,9 @@ CREATE TABLE tb_pessoa (
     in_sindico           BOOLEAN DEFAULT FALSE,
     id_condominio        BIGINT NOT NULL,
     id_endereco          BIGINT NOT NULL,
-    CONSTRAINT uk_pessoa_condominio UNIQUE (id_condominio),
-    CONSTRAINT uk_pessoa_endereco UNIQUE (id_endereco),
+    -- Sem UNIQUE em id_condominio nem em id_endereco: um condominio tem muitos moradores, e
+    -- duas pessoas da mesma unidade dividem o endereco. Ver migration V4, que remove essas
+    -- constraints das bases criadas antes desta correcao.
     CONSTRAINT fk_pessoa_condominio FOREIGN KEY (id_condominio) REFERENCES tb_condominio (id_condominio),
     CONSTRAINT fk_pessoa_endereco FOREIGN KEY (id_endereco) REFERENCES tb_endereco (id_endereco)
 );

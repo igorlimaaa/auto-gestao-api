@@ -56,6 +56,36 @@ se o número de agregados desacoplados crescer bastante.
 - Repositories são só `extends JpaRepository<X, Long>` — sem `@Configuration`,
   `@ComponentScan` ou `@EnableAutoConfiguration`.
 
+## Modelo de domínio
+
+```
+Condominio 1──N Unidade 1──N Pessoa
+     │                          │
+     └──────────── 1──N ────────┘        (Pessoa.condominio, sempre obrigatório)
+Condominio 1──N TaxaExtra
+```
+
+- **`Unidade` (V3)** é o apartamento/sala em si. Antes existia só `Pessoa.nr_unidade`, um
+  número solto: não dava para cadastrar unidade vazia, nem havia o que impedisse um morador de
+  apontar para uma unidade inexistente.
+- **`Pessoa.unidade` é opcional nos dois sentidos**: unidade sem morador e morador sem unidade
+  são cadastros válidos. A FK é NULL-ável de propósito — o que ela garante é que, *havendo*
+  vínculo, a unidade exista.
+- **`ds_bloco` é `NOT NULL DEFAULT ''`**, não nulável. No Postgres NULL não colide com NULL num
+  UNIQUE, então bloco nulo exigiria índice sobre `COALESCE(ds_bloco,'')` — expressão que o H2
+  dos testes não aceita. String vazia = "sem bloco", e o UNIQUE fica simples nos dois bancos.
+- **`Pessoa.condominio` e `Pessoa.endereco` são `@ManyToOne`** (V4). Eram `@OneToOne`, e as
+  UNIQUE que isso gerava significavam, na prática, *um morador por condomínio*.
+- `Pessoa.endereco` é opcional: exigir endereço completo para cadastrar quem mora no condomínio
+  contraria o cadastro independente.
+
+### Migrations
+
+`db/migration` é o schema; `db/migration-dev` é o seed de desenvolvimento. O seed mora **fora**
+de `db/migration` porque o Flyway varre cada location **recursivamente** — uma subpasta
+`db/migration/dev` entra em todo profile, inclusive `test` e `prod`, por mais que só o dev a
+liste. Foi assim que o seed quebrou os testes em H2 com sintaxe Postgres-only.
+
 ## Segurança
 
 Todo endpoint de domínio exige um JWT de acesso válido emitido pelo
@@ -70,6 +100,10 @@ subiu.
 - **`jwk-set-uri`, não só `issuer-uri`**: com `issuer-uri` sozinho o Spring faz OpenID Discovery
   na criação do bean, o que obrigaria o oauth-service a estar no ar quando este serviço sobe. O
   `issuer-uri` continua configurado porque é ele que faz validar o claim `iss`.
+- **`EscopoDoCondominio`**: ter `MORADOR_LER` não é ver os moradores de todos os condomínios.
+  O recorte vem do claim `condominio` do token — o condomínio do perfil ativo. Perfis globais
+  (`ADMINISTRADORA`) não têm esse claim e enxergam tudo. Listagens são filtradas mesmo sem o
+  cliente pedir; pedir outro condomínio responde 403, em vez de devolver o próprio em silêncio.
 - **`ValidadorDeEscopoDeAcesso`**: o oauth-service emite dois tipos de token com a mesma chave e
   o mesmo issuer — o de acesso e o de seleção de perfil. Só o claim `escopo` os separa; sem esse
   validador, um token de seleção passaria por `authenticated()`.

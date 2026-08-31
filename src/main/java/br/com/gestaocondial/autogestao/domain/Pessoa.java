@@ -7,7 +7,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.OneToOne;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 import lombok.AllArgsConstructor;
@@ -31,8 +31,6 @@ public class Pessoa {
 	@Column(name = "ds_pessoa")
 	private String nomeCompleto;
 	
-	@Column(name = "nr_unidade")
-	private Long numeroUnidade;
 	
 	@Column(name = "nr_cpf")
 	private String cpf;
@@ -46,13 +44,27 @@ public class Pessoa {
 	@Column(name = "in_sindico", columnDefinition="boolean default false")
 	private Boolean isSindico;
 	
-	@OneToOne
+	/** ManyToOne, nao OneToOne: um condominio tem muitos moradores. Ver migration V4. */
+	@ManyToOne(optional = false)
 	@JoinColumn(name="id_condominio", nullable = false)
 	private Condominio condominio;
 	
-	@OneToOne
-	@JoinColumn(name="id_endereco", nullable = false)
+	/**
+	 * Endereco proprio da pessoa. Opcional — exigir um endereco completo para cadastrar quem
+	 * mora no condominio contraria o cadastro independente de morador e unidade.
+	 */
+	@ManyToOne
+	@JoinColumn(name="id_endereco")
 	private Endereco endereco;
+
+	/**
+	 * Unidade onde a pessoa mora. Opcional nos dois sentidos: uma unidade pode existir sem
+	 * morador e uma pessoa pode ser cadastrada antes de se saber onde ela vai morar. A FK
+	 * garante apenas que, havendo vínculo, a unidade exista de fato.
+	 */
+	@ManyToOne
+	@JoinColumn(name = "id_unidade")
+	private Unidade unidade;
 	
 	
 	

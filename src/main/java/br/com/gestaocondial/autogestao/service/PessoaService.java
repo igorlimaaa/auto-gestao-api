@@ -21,4 +21,10 @@ public interface PessoaService {
 
 	public List<PessoaDto> findPessoasCondominioId(Long idCondominio);
 
+	public List<PessoaDto> findPessoas(Long idCondominio, Long idUnidade, Boolean semUnidade, String busca);
+
+	public PessoaDto updatePessoa(Long idPessoa, @Valid PessoaDto pessoa);
+
+	public void deletePessoa(Long idPessoa);
+
 }
