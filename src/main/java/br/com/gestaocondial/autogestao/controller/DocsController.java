@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 @Controller
 public class DocsController {
 
-	@GetMapping("/docs")
+	@GetMapping({"/docs", "/docs/"})
 	public String docs() {
 		return "forward:/docs/index.html";
 	}
