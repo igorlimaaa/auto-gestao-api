@@ -2,6 +2,7 @@ package br.com.gestaocondial.autogestao.dto;
 
 import org.hibernate.validator.constraints.br.CPF;
 
+import jakarta.validation.constraints.Email;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -21,6 +22,10 @@ public class PessoaDto {
 	 */
 	private UnidadeDto unidade;
 	private Boolean envioTaxaEmail;
+
+	@Email(message = "Informe um e-mail válido.")
+	private String email;
+
 	private Boolean envioImpresso;
 	private Boolean isSindico;
 	private CondominioDto condominio;

@@ -96,6 +96,7 @@ public class PessoaImpl implements PessoaService {
 		pessoa.setNomeCompleto(pessoaDto.getNomeCompleto());
 		pessoa.setCpf(pessoaDto.getCpf());
 		pessoa.setEnvioTaxaEmail(pessoaDto.getEnvioTaxaEmail());
+		pessoa.setEmail(pessoaDto.getEmail());
 		pessoa.setEnvioImpresso(pessoaDto.getEnvioImpresso());
 		pessoa.setIsSindico(pessoaDto.getIsSindico());
 		pessoa.setUnidade(unidadeDe(pessoaDto));

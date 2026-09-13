@@ -751,6 +751,12 @@ components:
             se saber onde vai morar. Para vincular, basta enviar o objeto com o `id`.
         envioTaxaEmail:
           type: boolean
+        email:
+          type: string
+          format: email
+          description: >
+            E-mail para onde as taxas e cobranças são enviadas quando `envioTaxaEmail` é
+            verdadeiro.
         envioImpresso:
           type: boolean
         isSindico:

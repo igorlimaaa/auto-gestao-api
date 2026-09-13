@@ -37,7 +37,11 @@ public class Pessoa {
 	
 	@Column(name = "in_envio_email", columnDefinition="boolean default false")
 	private Boolean envioTaxaEmail;
-	
+
+	/** E-mail para onde as taxas e cobrancas sao enviadas quando envioTaxaEmail e verdadeiro. */
+	@Column(name = "ds_email")
+	private String email;
+
 	@Column(name = "in_envio_impresso", columnDefinition="boolean default false")
 	private Boolean envioImpresso;
 	
