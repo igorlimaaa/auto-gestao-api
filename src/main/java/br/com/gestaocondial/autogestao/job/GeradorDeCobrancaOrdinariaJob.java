@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import br.com.gestaocondial.autogestao.domain.CobrancaOrdinaria;
 import br.com.gestaocondial.autogestao.domain.Condominio;
 import br.com.gestaocondial.autogestao.domain.Unidade;
+import br.com.gestaocondial.autogestao.exception.CondominioNaoEncontradoException;
 import br.com.gestaocondial.autogestao.repository.CobrancaOrdinariaRepository;
 import br.com.gestaocondial.autogestao.repository.CondominioRepository;
 import br.com.gestaocondial.autogestao.repository.UnidadeRepository;
@@ -19,16 +20,18 @@ import lombok.RequiredArgsConstructor;
 /**
  * Gera, com antecedência, o registro de cobrança da taxa ordinária de cada unidade ativa.
  *
- * <p>Regra por condomínio (com {@code diaVencimentoTaxaOrdinaria} cadastrado):</p>
- * <ul>
- * <li><b>Bootstrap</b>: se o condomínio ainda não tem nenhuma cobrança gerada, gera a
- * competência do mês atual imediatamente — não espera o gatilho abaixo, porque não existe um
- * ciclo anterior do qual contar os "10 dias depois".</li>
- * <li><b>Regime</b>: senão, só gera a competência seguinte quando hoje for exatamente 10 dias
- * depois do vencimento deste mês (ex.: vencimento dia 10 → gera no dia 20 a competência do mês
- * seguinte), dando ao administrador ~20 dias para preencher PIX/linha digitável antes do
- * próximo vencimento.</li>
- * </ul>
+ * <p>A "competência vigente" de um condomínio (com {@code diaVencimentoTaxaOrdinaria}
+ * cadastrado) é sempre calculada a partir de hoje, nunca do histórico de cobranças já geradas:
+ * é o mês corrente, a menos que o gatilho de 10 dias depois do vencimento daquele mês já tenha
+ * passado — nesse caso já é o mês seguinte (e assim por diante, se vários ciclos já tiverem
+ * passado). Isso evita gerar uma competência retroativa quando o condomínio é configurado (ou
+ * o job roda pela primeira vez) depois que o próprio gatilho do mês corrente já passou — ex.:
+ * vencimento cadastrado no dia 3, condomínio configurado no dia 14: o gatilho do mês corrente
+ * (dia 13) já passou, então a competência vigente é a do mês seguinte, não a do mês corrente.
+ *
+ * <p>Ver {@link #competenciaVigente(int, LocalDate)}. Dar ~10 dias de antecedência ao gatilho
+ * (vencimento + 10 dias) dá ao administrador tempo de preencher PIX/linha digitável antes do
+ * próximo vencimento.</p>
  *
  * <p>Idempotente: {@code existsByUnidadeIdAndCompetencia} é conferido antes de cada insert, e a
  * constraint única {@code uk_cobranca_unidade_competencia} (migration V8) é a rede de segurança
@@ -57,25 +60,27 @@ public class GeradorDeCobrancaOrdinariaJob {
 		}
 	}
 
+	/**
+	 * Disparo manual (endpoint {@code POST /cobrancaOrdinaria/gerar}), restrito a um único
+	 * condomínio — usa a data de hoje de verdade, nunca uma simulada. Mesma lógica e mesma
+	 * idempotência do job agendado, só que sob demanda.
+	 */
+	@Transactional
+	public void gerarParaCondominio(Long idCondominio) {
+		Condominio condominio = condominioRepository.findById(idCondominio)
+				.orElseThrow(() -> new CondominioNaoEncontradoException("Condomínio não encontrado: " + idCondominio));
+		if (condominio.getDiaVencimentoTaxaOrdinaria() == null) {
+			throw new IllegalArgumentException(
+					"Condomínio ainda não tem o dia de vencimento da taxa ordinária cadastrado.");
+		}
+		gerarParaCondominio(condominio, LocalDate.now());
+	}
+
 	private void gerarParaCondominio(Condominio condominio, LocalDate hoje) {
 		int dia = condominio.getDiaVencimentoTaxaOrdinaria();
-		LocalDate vencimentoDesteMes = diaNoMes(dia, YearMonth.from(hoje));
-
-		LocalDate competenciaAlvo;
-		LocalDate vencimentoAlvo;
-
-		boolean bootstrap = !cobrancaRepository.existsByUnidadeCondominioId(condominio.getId());
-		if (bootstrap) {
-			competenciaAlvo = hoje.withDayOfMonth(1);
-			vencimentoAlvo = vencimentoDesteMes;
-		} else {
-			if (!hoje.isEqual(vencimentoDesteMes.plusDays(10))) {
-				return;
-			}
-			YearMonth proximoMes = YearMonth.from(hoje).plusMonths(1);
-			competenciaAlvo = proximoMes.atDay(1);
-			vencimentoAlvo = diaNoMes(dia, proximoMes);
-		}
+		YearMonth mesVigente = competenciaVigente(dia, hoje);
+		LocalDate competenciaAlvo = mesVigente.atDay(1);
+		LocalDate vencimentoAlvo = diaNoMes(dia, mesVigente);
 
 		for (Unidade unidade : unidadeRepository.findByCondominioIdAndAtivaTrue(condominio.getId())) {
 			if (cobrancaRepository.existsByUnidadeIdAndCompetencia(unidade.getId(), competenciaAlvo)) {
@@ -88,6 +93,20 @@ public class GeradorDeCobrancaOrdinariaJob {
 			cobranca.setValor(condominio.getValorTaxaCondominial());
 			cobrancaRepository.save(cobranca);
 		}
+	}
+
+	/**
+	 * Mês cuja cobrança deveria existir hoje, dados só o dia de vencimento — não depende de
+	 * nenhuma cobrança já ter sido gerada antes. É o mês corrente, a menos que o gatilho daquele
+	 * mês (vencimento + 10 dias) já tenha passado (ou seja hoje), caso em que já rolou para o mês
+	 * seguinte — repetindo o teste até achar um mês cujo gatilho ainda não chegou.
+	 */
+	static YearMonth competenciaVigente(int dia, LocalDate hoje) {
+		YearMonth mes = YearMonth.from(hoje);
+		while (!diaNoMes(dia, mes).plusDays(10).isAfter(hoje)) {
+			mes = mes.plusMonths(1);
+		}
+		return mes;
 	}
 
 	/** Vencimento clampado ao último dia do mês-alvo — ex.: dia 31 em fevereiro vira dia 28/29. */

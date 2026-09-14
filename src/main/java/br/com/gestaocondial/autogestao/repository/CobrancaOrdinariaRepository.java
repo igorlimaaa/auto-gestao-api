@@ -12,7 +12,4 @@ public interface CobrancaOrdinariaRepository
 
 	boolean existsByUnidadeIdAndCompetencia(Long idUnidade, LocalDate competencia);
 
-	/** Usado pelo job para saber se um condomínio já teve alguma cobrança gerada (bootstrap). */
-	boolean existsByUnidadeCondominioId(Long idCondominio);
-
 }

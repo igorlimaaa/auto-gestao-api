@@ -25,8 +25,9 @@ tags:
     description: >
       Controle mensal de cobrança da taxa ordinária, por unidade — nunca por morador, para que
       a troca de morador não afete o histórico de pagamento. Os registros nascem por um job
-      agendado, a partir do dia de vencimento cadastrado no condomínio; não há criação nem
-      exclusão manual.
+      agendado, a partir do dia de vencimento cadastrado no condomínio, ou por disparo manual
+      desse mesmo job (`POST /cobrancaOrdinaria/gerar`) — não há criação avulsa nem exclusão
+      manual.
 paths:
   /condominio:
     get:
@@ -708,6 +709,35 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CobrancaOrdinaria"
+        "400":
+          $ref: "#/components/responses/DadosInvalidos"
+        "404":
+          $ref: "#/components/responses/NaoEncontrado"
+  /cobrancaOrdinaria/gerar:
+    post:
+      tags: [CobrancaOrdinaria]
+      operationId: gerarCobrancasOrdinarias
+      summary: Dispara manualmente a geração das cobranças pendentes.
+      description: >
+        Exige a permissão `COBRANCA_ESCREVER`. Roda exatamente a mesma lógica do job agendado,
+        usando a data de hoje — não simula outras datas. Existe para testar o fluxo sem esperar
+        o calendário, e como rede de segurança manual caso o job agendado não rode em algum dia.
+        Idempotente: nunca duplica uma cobrança já gerada para a mesma unidade e competência.
+
+        Sem `idCondominio`, um perfil com escopo (síndico, subsíndico, etc.) roda só para o
+        próprio condomínio; um perfil global (sem claim de condomínio) roda para todos. Pedir
+        explicitamente um condomínio fora do próprio escopo responde 403.
+      parameters:
+        - name: idCondominio
+          in: query
+          description: Restringe a geração a um único condomínio.
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: >
+            Geração concluída — nenhuma cobrança nova é criada se não havia nada pendente.
         "400":
           $ref: "#/components/responses/DadosInvalidos"
         "404":

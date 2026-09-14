@@ -13,6 +13,7 @@ import br.com.gestaocondial.autogestao.api.model.DadosDePagamentoCobranca;
 import br.com.gestaocondial.autogestao.api.model.RegistroDePagamento;
 import br.com.gestaocondial.autogestao.config.EscopoDoCondominio;
 import br.com.gestaocondial.autogestao.dto.CobrancaOrdinariaDto;
+import br.com.gestaocondial.autogestao.job.GeradorDeCobrancaOrdinariaJob;
 import br.com.gestaocondial.autogestao.mapper.CobrancaOrdinariaApiMapper;
 import br.com.gestaocondial.autogestao.service.CobrancaOrdinariaService;
 
@@ -27,6 +28,8 @@ public class CobrancaOrdinariaController implements CobrancaOrdinariaApi {
 	private final CobrancaOrdinariaApiMapper cobrancaApiMapper;
 
 	private final EscopoDoCondominio escopoDoCondominio;
+
+	private final GeradorDeCobrancaOrdinariaJob geradorDeCobrancaOrdinariaJob;
 
 	@Override
 	@PreAuthorize("hasAuthority('COBRANCA_LER')")
@@ -64,6 +67,18 @@ public class CobrancaOrdinariaController implements CobrancaOrdinariaApi {
 		LocalDate dataPagamento = registroDePagamento == null ? null : registroDePagamento.getDataPagamento();
 		return ResponseEntity
 				.ok(cobrancaApiMapper.toApi(cobrancaService.registrarPagamento(idCobrancaOrdinaria, dataPagamento)));
+	}
+
+	@Override
+	@PreAuthorize("hasAuthority('COBRANCA_ESCREVER')")
+	public ResponseEntity<Void> gerarCobrancasOrdinarias(Long idCondominio) {
+		Long escopo = escopoDoCondominio.restringir(idCondominio);
+		if (escopo == null) {
+			geradorDeCobrancaOrdinariaJob.gerar();
+		} else {
+			geradorDeCobrancaOrdinariaJob.gerarParaCondominio(escopo);
+		}
+		return ResponseEntity.noContent().build();
 	}
 
 }
