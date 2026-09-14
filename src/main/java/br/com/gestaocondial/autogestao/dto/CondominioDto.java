@@ -19,6 +19,7 @@ public class CondominioDto {
 	private Double valorMulta;
 	private Boolean possuiTaxaExtra = false;
 	private Double valorTaxaCondominial;
+	private Integer diaVencimentoTaxaOrdinaria;
 	private Double valorTaxasExtras;
 	private Double valorTotalPorUnidade;
 

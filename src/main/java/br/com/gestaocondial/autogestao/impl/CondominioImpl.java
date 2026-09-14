@@ -94,6 +94,7 @@ public class CondominioImpl implements CondominioService {
 		condominio.setValorTaxaCondominial(condominioDto.getValorTaxaCondominial());
 		condominio.setValorJuros(condominioDto.getValorJuros());
 		condominio.setValorMulta(condominioDto.getValorMulta());
+		condominio.setDiaVencimentoTaxaOrdinaria(condominioDto.getDiaVencimentoTaxaOrdinaria());
 
 		condominio = condominioRepository.save(condominio);
 

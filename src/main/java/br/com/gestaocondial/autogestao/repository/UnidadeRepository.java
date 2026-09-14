@@ -12,6 +12,9 @@ public interface UnidadeRepository extends JpaRepository<Unidade, Long>, JpaSpec
 
 	List<Unidade> findByCondominioId(Long idCondominio);
 
+	/** Usado pelo job de geração de cobranças: só unidades ativas são cobradas. */
+	List<Unidade> findByCondominioIdAndAtivaTrue(Long idCondominio);
+
 	long countByCondominioId(Long idCondominio);
 
 	/**

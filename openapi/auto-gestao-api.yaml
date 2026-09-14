@@ -21,6 +21,12 @@ tags:
     description: >
       Operações sobre unidades autônomas (apartamento, sala, loja). Uma unidade existe por si
       só: pode ser cadastrada vazia, e o morador é ligado a ela depois — ou nunca.
+  - name: CobrancaOrdinaria
+    description: >
+      Controle mensal de cobrança da taxa ordinária, por unidade — nunca por morador, para que
+      a troca de morador não afete o histórico de pagamento. Os registros nascem por um job
+      agendado, a partir do dia de vencimento cadastrado no condomínio; não há criação nem
+      exclusão manual.
 paths:
   /condominio:
     get:
@@ -618,6 +624,125 @@ paths:
           $ref: "#/components/responses/NaoEncontrado"
         "409":
           $ref: "#/components/responses/EmUso"
+  /cobrancaOrdinaria:
+    get:
+      tags: [CobrancaOrdinaria]
+      operationId: listCobrancasOrdinarias
+      summary: Lista as cobranças da taxa ordinária.
+      description: >
+        Exige a permissão `COBRANCA_LER`. Todos os filtros são opcionais e combináveis.
+      parameters:
+        - name: idCondominio
+          in: query
+          description: Restringe a um condomínio.
+          schema:
+            type: integer
+            format: int64
+        - name: idUnidade
+          in: query
+          description: Restringe a uma unidade.
+          schema:
+            type: integer
+            format: int64
+        - name: competencia
+          in: query
+          description: Restringe a uma competência (sempre o dia 1 do mês, ex. "2026-05-01").
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Cobranças encontradas.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CobrancaOrdinaria"
+  /cobrancaOrdinaria/{idCobrancaOrdinaria}:
+    get:
+      tags: [CobrancaOrdinaria]
+      operationId: findCobrancaOrdinaria
+      summary: Busca uma cobrança da taxa ordinária pelo id.
+      description: Exige a permissão `COBRANCA_LER`.
+      parameters:
+        - name: idCobrancaOrdinaria
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Cobrança encontrada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CobrancaOrdinaria"
+        "404":
+          $ref: "#/components/responses/NaoEncontrado"
+    patch:
+      tags: [CobrancaOrdinaria]
+      operationId: updateDadosDePagamentoCobrancaOrdinaria
+      summary: Atualiza o PIX copia-e-cola e a linha digitável do boleto da cobrança.
+      description: >
+        Exige a permissão `COBRANCA_ESCREVER`. Preenchidos manualmente pelo administrador
+        enquanto não existir integração automática de pagamento.
+      parameters:
+        - name: idCobrancaOrdinaria
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DadosDePagamentoCobranca"
+      responses:
+        "200":
+          description: Dados de pagamento atualizados.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CobrancaOrdinaria"
+        "400":
+          $ref: "#/components/responses/DadosInvalidos"
+        "404":
+          $ref: "#/components/responses/NaoEncontrado"
+  /cobrancaOrdinaria/{idCobrancaOrdinaria}/pagamento:
+    post:
+      tags: [CobrancaOrdinaria]
+      operationId: registrarPagamentoCobrancaOrdinaria
+      summary: Registra o pagamento da cobrança.
+      description: >
+        Exige a permissão `COBRANCA_ESCREVER`. A unidade passa a constar EM DIA. Sem
+        `dataPagamento` no corpo, vale a data de hoje.
+      parameters:
+        - name: idCobrancaOrdinaria
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegistroDePagamento"
+      responses:
+        "200":
+          description: Pagamento registrado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CobrancaOrdinaria"
+        "400":
+          $ref: "#/components/responses/DadosInvalidos"
+        "404":
+          $ref: "#/components/responses/NaoEncontrado"
 components:
   responses:
     DadosInvalidos:
@@ -710,6 +835,14 @@ components:
         valorTaxaCondominial:
           type: number
           format: double
+        diaVencimentoTaxaOrdinaria:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 31
+          description: >
+            Dia do mês em que a taxa ordinária vence. Base para a geração mensal das cobranças
+            (ver `CobrancaOrdinaria`) e para marcar uma unidade como inadimplente.
         valorTaxasExtras:
           type: number
           format: double
@@ -804,6 +937,62 @@ components:
         dataCadastro:
           type: string
           format: date-time
+    CobrancaOrdinaria:
+      type: object
+      description: >
+        Registro mensal de cobrança da taxa ordinária de uma unidade. Nasce pelo job agendado
+        (ver a descrição da tag `CobrancaOrdinaria`) — não há endpoint de criação nem exclusão.
+      properties:
+        id:
+          type: integer
+          format: int64
+          readOnly: true
+        unidade:
+          $ref: "#/components/schemas/Unidade"
+        competencia:
+          type: string
+          format: date
+          readOnly: true
+          description: Sempre o dia 1 do mês a que a cobrança se refere.
+        dataVencimento:
+          type: string
+          format: date
+          readOnly: true
+        valor:
+          type: number
+          format: double
+          readOnly: true
+          description: Snapshot da taxa condominial no momento da geração. Não inclui taxas extras.
+        pixCopiaCola:
+          type: string
+          description: Preenchido manualmente pelo administrador.
+        linhaDigitavel:
+          type: string
+          description: Linha digitável do boleto, preenchida manualmente pelo administrador.
+        dataPagamento:
+          type: string
+          format: date
+        situacao:
+          type: string
+          readOnly: true
+          enum: [PENDENTE, PAGO, INADIMPLENTE]
+          description: >
+            Calculada no servidor: PAGO quando há `dataPagamento`; INADIMPLENTE quando o
+            vencimento passou sem pagamento; PENDENTE nos demais casos.
+    DadosDePagamentoCobranca:
+      type: object
+      properties:
+        pixCopiaCola:
+          type: string
+        linhaDigitavel:
+          type: string
+    RegistroDePagamento:
+      type: object
+      properties:
+        dataPagamento:
+          type: string
+          format: date
+          description: Ausente vale "hoje".
     ErroDeParametro:
       type: object
       properties:

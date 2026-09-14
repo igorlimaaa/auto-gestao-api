@@ -13,6 +13,7 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 
 import br.com.gestaocondial.autogestao.exception.AcessoNegadoException;
+import br.com.gestaocondial.autogestao.exception.CobrancaOrdinariaNaoEncontradaException;
 import br.com.gestaocondial.autogestao.exception.CondominioNaoEncontradoException;
 import br.com.gestaocondial.autogestao.exception.EnderecoNaoEncontradoException;
 import br.com.gestaocondial.autogestao.exception.PessoaNaoEncontradaException;
@@ -40,7 +41,8 @@ public class GlobalExceptionHandler {
 	}
 
 	@ExceptionHandler({ CondominioNaoEncontradoException.class, UnidadeNaoEncontradaException.class,
-			PessoaNaoEncontradaException.class, TaxaExtraNaoEncontradaException.class })
+			PessoaNaoEncontradaException.class, TaxaExtraNaoEncontradaException.class,
+			CobrancaOrdinariaNaoEncontradaException.class })
 	public ResponseEntity<ListaDeErrosOutputDto> handleNaoEncontrado(RuntimeException ex) {
 		return resposta(null, ex.getMessage(), HttpStatus.NOT_FOUND);
 	}

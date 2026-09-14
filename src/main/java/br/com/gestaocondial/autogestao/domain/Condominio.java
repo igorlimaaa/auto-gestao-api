@@ -51,6 +51,9 @@ public class Condominio {
 	@Column(name = "in_taxa_extra", nullable = false, columnDefinition="boolean default false")
 	@NotNull
 	private Boolean possuiTaxaExtra;
-	
+
+	/** Base para a geração mensal de {@code CobrancaOrdinaria} e para marcar inadimplência. */
+	@Column(name = "nr_dia_vencimento_taxa_ordinaria")
+	private Integer diaVencimentoTaxaOrdinaria;
 
 }
