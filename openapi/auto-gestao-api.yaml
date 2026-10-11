@@ -742,6 +742,31 @@ paths:
           $ref: "#/components/responses/DadosInvalidos"
         "404":
           $ref: "#/components/responses/NaoEncontrado"
+  /cobrancaOrdinaria/sincronizar:
+    post:
+      tags: [CobrancaOrdinaria]
+      operationId: sincronizarCobrancasOrdinarias
+      summary: Dispara manualmente a sincronização com o Banco Inter.
+      description: >
+        Exige a permissão `COBRANCA_ESCREVER`. Importa as cobranças emitidas no banco (janela de
+        30 dias atrás a 60 dias à frente, por vencimento) e confere a situação das ainda não
+        pagas — a mesma lógica dos jobs agendados. O banco só é consultado (GET); nada é emitido
+        nem alterado lá. Condomínios sem credenciais do banco configuradas são ignorados.
+
+        Sem `idCondominio`, um perfil com escopo roda só para o próprio condomínio; um perfil
+        global roda para todos. Pedir um condomínio fora do escopo responde 403.
+      parameters:
+        - name: idCondominio
+          in: query
+          description: Restringe a sincronização a um único condomínio.
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Sincronização concluída.
+        "404":
+          $ref: "#/components/responses/NaoEncontrado"
   /cobrancaOrdinaria/{idCobrancaOrdinaria}/pagamento:
     post:
       tags: [CobrancaOrdinaria]
@@ -995,20 +1020,43 @@ components:
           description: Snapshot da taxa condominial no momento da geração. Não inclui taxas extras.
         pixCopiaCola:
           type: string
-          description: Preenchido manualmente pelo administrador.
+          description: Vem do Banco Inter; só é preenchido à mão em cobranças que não vieram de lá.
         linhaDigitavel:
           type: string
-          description: Linha digitável do boleto, preenchida manualmente pelo administrador.
+          description: Linha digitável do boleto. Vem do Banco Inter; só é preenchida à mão em cobranças que não vieram de lá.
         dataPagamento:
           type: string
           format: date
+        codigoBarras:
+          type: string
+          readOnly: true
+          description: Código de barras do boleto, vindo do Banco Inter.
+        valorTotalRecebido:
+          type: number
+          format: double
+          readOnly: true
+          description: Valor efetivamente recebido, informado pelo banco (pode incluir multa e juros).
+        origemRecebimento:
+          type: string
+          readOnly: true
+          description: Como foi pago, segundo o banco — `PIX` ou `BOLETO`.
+        codigoSolicitacao:
+          type: string
+          readOnly: true
+          description: Id da cobrança no Banco Inter. Ausente em cobranças que não vieram do banco.
+        dataUltimaSincronizacao:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Quando a situação foi conferida pela última vez com o banco.
         situacao:
           type: string
           readOnly: true
-          enum: [PENDENTE, PAGO, INADIMPLENTE]
+          enum: [PENDENTE, PAGO, INADIMPLENTE, CANCELADA]
           description: >
-            Calculada no servidor: PAGO quando há `dataPagamento`; INADIMPLENTE quando o
-            vencimento passou sem pagamento; PENDENTE nos demais casos.
+            Calculada no servidor: PAGO quando há `dataPagamento`; CANCELADA quando o banco
+            informa cancelada ou expirada; INADIMPLENTE quando o vencimento passou sem
+            pagamento; PENDENTE nos demais casos.
     DadosDePagamentoCobranca:
       type: object
       properties:

@@ -5,6 +5,9 @@ bin/
 !**/src/test/**/target/
 .env
 
+### Credenciais do Banco Inter (segredos + certificados) ###
+credenciais-inter/
+
 ### STS ###
 .apt_generated
 .classpath

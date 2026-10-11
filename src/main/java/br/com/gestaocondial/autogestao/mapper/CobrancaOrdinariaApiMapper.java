@@ -1,5 +1,8 @@
 package br.com.gestaocondial.autogestao.mapper;
 
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 import org.mapstruct.Mapper;
@@ -33,6 +36,16 @@ public interface CobrancaOrdinariaApiMapper {
 	default br.com.gestaocondial.autogestao.api.model.CobrancaOrdinaria.SituacaoEnum map(SituacaoCobrancaEnum value) {
 		return value == null ? null
 				: br.com.gestaocondial.autogestao.api.model.CobrancaOrdinaria.SituacaoEnum.valueOf(value.name());
+	}
+
+	// `format: date-time` gera OffsetDateTime no modelo de wire; a entidade guarda LocalDateTime
+	// no fuso do servidor.
+	default LocalDateTime map(OffsetDateTime value) {
+		return value == null ? null : value.atZoneSameInstant(ZoneId.systemDefault()).toLocalDateTime();
+	}
+
+	default OffsetDateTime map(LocalDateTime value) {
+		return value == null ? null : value.atZone(ZoneId.systemDefault()).toOffsetDateTime();
 	}
 
 }

@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import br.com.gestaocondial.autogestao.domain.CobrancaOrdinaria;
+import br.com.gestaocondial.autogestao.banking.SituacoesDoBanco;
 import br.com.gestaocondial.autogestao.dto.CobrancaOrdinariaDto;
 import br.com.gestaocondial.autogestao.enumeration.SituacaoCobrancaEnum;
 import br.com.gestaocondial.autogestao.exception.CobrancaOrdinariaNaoEncontradaException;
@@ -76,6 +77,9 @@ public class CobrancaOrdinariaImpl implements CobrancaOrdinariaService {
 	private static SituacaoCobrancaEnum calcularSituacao(CobrancaOrdinaria cobranca) {
 		if (cobranca.getDataPagamento() != null) {
 			return SituacaoCobrancaEnum.PAGO;
+		}
+		if (SituacoesDoBanco.CANCELADAS.contains(cobranca.getSituacaoBanco())) {
+			return SituacaoCobrancaEnum.CANCELADA;
 		}
 		return LocalDate.now().isAfter(cobranca.getDataVencimento())
 				? SituacaoCobrancaEnum.INADIMPLENTE

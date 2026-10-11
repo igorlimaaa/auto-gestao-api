@@ -86,6 +86,33 @@ de `db/migration` porque o Flyway varre cada location **recursivamente** — uma
 `db/migration/dev` entra em todo profile, inclusive `test` e `prod`, por mais que só o dev a
 liste. Foi assim que o seed quebrou os testes em H2 com sintaxe Postgres-only.
 
+## Integração com o Banco Inter (somente leitura)
+
+As cobranças nascem no Inter (recorrência criada lá). Este serviço só **consulta** (`GET`; o único
+`POST` é o do token OAuth) e guarda o que precisa. Código em `banking/` (cliente) +
+`impl/SincronizacaoBancariaImpl` + `job/SincronizadorDeCobrancasInterJob`.
+
+- **Uma conta Inter por condomínio.** Segredos em arquivos, nunca no banco nem na imagem:
+  `${INTER_CREDENCIAIS_DIR}/<idCondominio>/{credenciais.properties, certificado.crt, chave.key}`
+  (`client-id` / `client-secret`; chave PKCS#8 em PEM). Condomínio sem a pasta não é integrado e
+  é ignorado. Em prod a pasta é o volume `infra/inter-credenciais` (read-only). Em dev:
+  `./credenciais-inter/` (no `.gitignore`).
+- **mTLS sem `.p12`**: `InterSslContexts` monta o keystore em memória a partir dos PEM. Endpoints,
+  paginação (`paginacao.paginaAtual`, 0-based) e URL do token seguem o SDK `inter-co/pj-sdk-java`.
+- **Casamento com a unidade**: `seuNumero` = `<unidade>-<ano>` (`1203-26`). Como a mesma unidade
+  tem uma cobrança por mês, a **competência vem do mês do vencimento**. Se o mesmo número existir
+  em mais de um bloco, o `seuNumero` é ambíguo e a cobrança é ignorada (com `WARN`).
+- **Imutável vs. mutável**: PIX copia-e-cola, linha digitável, código de barras, nosso número,
+  txid e `codigoSolicitacao` são gravados uma vez (V9) — a tela nunca consulta o banco para
+  exibi-los. Situação, pagamento, valor e origem do recebimento são atualizados pelo job.
+- **Jobs**: importação diária às 03:30 (janela −30/+60 dias por vencimento) e reconsulta horária
+  das cobranças vindas do banco, sem `dt_pagamento` e fora de `RECEBIDO/CANCELADO/EXPIRADO`.
+  Disparo manual: `POST /cobrancaOrdinaria/sincronizar`.
+- **Sem transação durante HTTP**: cada gravação é uma transação curta (`TransactionTemplate`); a
+  falha de uma cobrança não derruba o lote, e 3 falhas seguidas num condomínio encerram a rodada
+  dele.
+- **Smoke test real** (opt-in): `INTER_SMOKE_DIR=<pasta> ./mvnw test -Dtest=InterCobrancaClientSmokeTest`.
+
 ## Segurança
 
 Todo endpoint de domínio exige um JWT de acesso válido emitido pelo

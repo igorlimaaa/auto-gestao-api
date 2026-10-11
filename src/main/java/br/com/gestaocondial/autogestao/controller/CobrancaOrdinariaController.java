@@ -16,6 +16,7 @@ import br.com.gestaocondial.autogestao.dto.CobrancaOrdinariaDto;
 import br.com.gestaocondial.autogestao.job.GeradorDeCobrancaOrdinariaJob;
 import br.com.gestaocondial.autogestao.mapper.CobrancaOrdinariaApiMapper;
 import br.com.gestaocondial.autogestao.service.CobrancaOrdinariaService;
+import br.com.gestaocondial.autogestao.service.SincronizacaoBancariaService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -30,6 +31,8 @@ public class CobrancaOrdinariaController implements CobrancaOrdinariaApi {
 	private final EscopoDoCondominio escopoDoCondominio;
 
 	private final GeradorDeCobrancaOrdinariaJob geradorDeCobrancaOrdinariaJob;
+
+	private final SincronizacaoBancariaService sincronizacaoBancaria;
 
 	@Override
 	@PreAuthorize("hasAuthority('COBRANCA_LER')")
@@ -78,6 +81,15 @@ public class CobrancaOrdinariaController implements CobrancaOrdinariaApi {
 		} else {
 			geradorDeCobrancaOrdinariaJob.gerarParaCondominio(escopo);
 		}
+		return ResponseEntity.noContent().build();
+	}
+
+	@Override
+	@PreAuthorize("hasAuthority('COBRANCA_ESCREVER')")
+	public ResponseEntity<Void> sincronizarCobrancasOrdinarias(Long idCondominio) {
+		Long escopo = escopoDoCondominio.restringir(idCondominio);
+		sincronizacaoBancaria.importar(escopo);
+		sincronizacaoBancaria.sincronizarPendentes(escopo);
 		return ResponseEntity.noContent().build();
 	}
 

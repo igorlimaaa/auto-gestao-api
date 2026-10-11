@@ -61,6 +61,40 @@ public class CobrancaOrdinaria {
 	@Column(name = "dt_pagamento")
 	private LocalDate dataPagamento;
 
+	/** Id da cobrança no Banco Inter — chave de toda consulta ao banco. Imutável. */
+	@Column(name = "ds_codigo_solicitacao", length = 40, unique = true)
+	private String codigoSolicitacao;
+
+	/** "&lt;unidade&gt;-&lt;ano&gt;", ex.: "1203-26". Imutável. */
+	@Column(name = "ds_seu_numero", length = 30)
+	private String seuNumero;
+
+	@Column(name = "ds_nosso_numero", length = 30)
+	private String nossoNumero;
+
+	@Column(name = "ds_codigo_barras", length = 60)
+	private String codigoBarras;
+
+	@Column(name = "ds_txid", length = 40)
+	private String txid;
+
+	@Column(name = "dt_emissao")
+	private LocalDate dataEmissao;
+
+	/** Situação como o banco informa (A_RECEBER, ATRASADO, RECEBIDO...). Mutável. */
+	@Column(name = "ds_situacao_banco", length = 30)
+	private String situacaoBanco;
+
+	@Column(name = "vl_total_recebido")
+	private Double valorTotalRecebido;
+
+	/** PIX ou BOLETO. */
+	@Column(name = "ds_origem_recebimento", length = 10)
+	private String origemRecebimento;
+
+	@Column(name = "dt_ultima_sincronizacao")
+	private LocalDateTime dataUltimaSincronizacao;
+
 	@Column(name = "dt_cadastro", nullable = false)
 	private LocalDateTime dataCadastro;
 

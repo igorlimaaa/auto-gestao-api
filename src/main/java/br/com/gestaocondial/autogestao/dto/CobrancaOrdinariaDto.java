@@ -1,6 +1,7 @@
 package br.com.gestaocondial.autogestao.dto;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 import br.com.gestaocondial.autogestao.enumeration.SituacaoCobrancaEnum;
 
@@ -23,6 +24,12 @@ public class CobrancaOrdinariaDto {
 	private String pixCopiaCola;
 	private String linhaDigitavel;
 	private LocalDate dataPagamento;
+	private String codigoBarras;
+	private Double valorTotalRecebido;
+	private String origemRecebimento;
+	private LocalDateTime dataUltimaSincronizacao;
+	/** Preenchido quando a cobrança veio do banco; nulo para cobranças só locais. */
+	private String codigoSolicitacao;
 
 	/** Calculada pelo service a partir de {@code dataPagamento}/{@code dataVencimento}. */
 	private SituacaoCobrancaEnum situacao;

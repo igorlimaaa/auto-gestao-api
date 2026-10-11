@@ -15,6 +15,9 @@ public interface UnidadeRepository extends JpaRepository<Unidade, Long>, JpaSpec
 	/** Usado pelo job de geração de cobranças: só unidades ativas são cobradas. */
 	List<Unidade> findByCondominioIdAndAtivaTrue(Long idCondominio);
 
+	/** Usado para casar o "seuNumero" do banco com a unidade: pode haver o mesmo número em blocos distintos. */
+	List<Unidade> findByCondominioIdAndNumero(Long idCondominio, String numero);
+
 	long countByCondominioId(Long idCondominio);
 
 	/**
