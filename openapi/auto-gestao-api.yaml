@@ -748,7 +748,7 @@ paths:
       operationId: sincronizarCobrancasOrdinarias
       summary: Dispara manualmente a sincronização com o Banco Inter.
       description: >
-        Exige a permissão `COBRANCA_ESCREVER`. Importa as cobranças emitidas no banco (janela de
+        Exige o papel `ADMINISTRADOR` e a permissão `COBRANCA_ESCREVER`. Importa as cobranças emitidas no banco (janela de
         30 dias atrás a 60 dias à frente, por vencimento) e confere a situação das ainda não
         pagas — a mesma lógica dos jobs agendados. O banco só é consultado (GET); nada é emitido
         nem alterado lá. Condomínios sem credenciais do banco configuradas são ignorados.

@@ -85,7 +85,8 @@ public class CobrancaOrdinariaController implements CobrancaOrdinariaApi {
 	}
 
 	@Override
-	@PreAuthorize("hasAuthority('COBRANCA_ESCREVER')")
+	// Só o papel ADMINISTRADOR: cada disparo consome chamadas da conta do condomínio no banco.
+	@PreAuthorize("hasRole('ADMINISTRADOR') and hasAuthority('COBRANCA_ESCREVER')")
 	public ResponseEntity<Void> sincronizarCobrancasOrdinarias(Long idCondominio) {
 		Long escopo = escopoDoCondominio.restringir(idCondominio);
 		sincronizacaoBancaria.importar(escopo);
