@@ -1,0 +1,25 @@
+{
+    "cobranca": {
+        "codigoSolicitacao": "84600ef0-5960-4618-8afa-c8a098348524",
+        "seuNumero": "1404-26",
+        "dataEmissao": "2026-09-22",
+        "dataVencimento": "2026-10-10",
+        "valorNominal": 850.00,
+        "tipoCobranca": "RECORRENTE",
+        "situacao": "RECEBIDO",
+        "dataSituacao": "2026-10-09",
+        "valorTotalRecebido": "850.00",
+        "origemRecebimento": "BOLETO",
+        "arquivada": false,
+        "descontos": [],
+        "multa": { "codigo": "PERCENTUAL", "taxa": 2.00 },
+        "mora": { "codigo": "TAXAMENSAL", "taxa": 0.33 },
+        "pagador": { "cpfCnpj": "00000000000", "tipoPessoa": "FISICA", "nome": "MORADOR A" }
+    },
+    "boleto": {
+        "nossoNumero": "90860146219",
+        "codigoBarras": "07797159500000850000001112176644790860146219",
+        "linhaDigitavel": "07790001161217664479208601462198715950000085000"
+    },
+    "pix": { "txid": "5543179151790110274000kOyGORiY8ukDI", "pixCopiaECola": "00020101021226980014BR.GOV.BCB.PIX-A" }
+}

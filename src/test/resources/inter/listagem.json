@@ -1,0 +1,56 @@
+{
+    "totalPaginas": 1,
+    "totalElementos": 2,
+    "tamanhoPagina": 100,
+    "primeiraPagina": true,
+    "ultimaPagina": true,
+    "numeroDeElementos": 2,
+    "cobrancas": [
+        {
+            "cobranca": {
+                "codigoSolicitacao": "84600ef0-5960-4618-8afa-c8a098348524",
+                "seuNumero": "1404-26",
+                "situacao": "A_RECEBER",
+                "dataSituacao": "2026-09-22",
+                "dataEmissao": "2026-09-22",
+                "dataVencimento": "2026-10-10",
+                "valorNominal": "850.00",
+                "tipoCobranca": "RECORRENTE",
+                "pagador": { "nome": "MORADOR A", "cpfCnpj": "00000000000" }
+            },
+            "boleto": {
+                "nossoNumero": "90860146219",
+                "linhaDigitavel": "07790001161217664479208601462198715950000085000",
+                "codigoBarras": "07797159500000850000001112176644790860146219"
+            },
+            "pix": {
+                "pixCopiaECola": "00020101021226980014BR.GOV.BCB.PIX-A",
+                "txid": "5543179151790110274000kOyGORiY8ukDI"
+            }
+        },
+        {
+            "cobranca": {
+                "codigoSolicitacao": "c0a7aee1-f83f-4c7a-a753-c04542c3c279",
+                "seuNumero": "1203-26",
+                "situacao": "RECEBIDO",
+                "dataSituacao": "2026-10-01",
+                "dataEmissao": "2026-09-22",
+                "dataVencimento": "2026-10-10",
+                "valorNominal": "850.00",
+                "valorTotalRecebido": "850.00",
+                "origemRecebimento": "PIX",
+                "tipoCobranca": "RECORRENTE",
+                "pagador": { "nome": "MORADOR B", "cpfCnpj": "00000000001" }
+            },
+            "boleto": {
+                "nossoNumero": "90860146227",
+                "linhaDigitavel": "07790001161217664479208601462271815950000085000",
+                "codigoBarras": "07798159500000850000001112176644790860146227"
+            },
+            "pix": {
+                "pixCopiaECola": "00020101021226980014BR.GOV.BCB.PIX-B",
+                "txid": "5543179151790110274000MaJc8n9UwVlF3"
+            }
+        }
+    ]
+}
