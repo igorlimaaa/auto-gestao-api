@@ -19,4 +19,14 @@ public final class SituacoesDoBanco {
 	private SituacoesDoBanco() {
 	}
 
+	// Set.of(...).contains(null) lança NullPointerException, e situação nula é o normal em cobrança
+	// que nunca foi sincronizada com o banco — por isso as consultas passam por aqui.
+	public static boolean paga(String situacao) {
+		return situacao != null && PAGAS.contains(situacao);
+	}
+
+	public static boolean cancelada(String situacao) {
+		return situacao != null && CANCELADAS.contains(situacao);
+	}
+
 }

@@ -256,7 +256,7 @@ public class SincronizacaoBancariaImpl implements SincronizacaoBancariaService {
 		cobranca.setOrigemRecebimento(dados.origemRecebimento());
 		cobranca.setValorTotalRecebido(
 				dados.valorTotalRecebido() != null ? dados.valorTotalRecebido().doubleValue() : null);
-		if (dados.situacao() != null && SituacoesDoBanco.PAGAS.contains(dados.situacao())) {
+		if (SituacoesDoBanco.paga(dados.situacao())) {
 			cobranca.setDataPagamento(dados.dataSituacao() != null ? dados.dataSituacao() : LocalDate.now());
 		}
 		cobranca.setDataUltimaSincronizacao(LocalDateTime.now());

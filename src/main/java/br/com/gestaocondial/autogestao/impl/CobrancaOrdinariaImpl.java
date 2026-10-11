@@ -78,7 +78,7 @@ public class CobrancaOrdinariaImpl implements CobrancaOrdinariaService {
 		if (cobranca.getDataPagamento() != null) {
 			return SituacaoCobrancaEnum.PAGO;
 		}
-		if (SituacoesDoBanco.CANCELADAS.contains(cobranca.getSituacaoBanco())) {
+		if (SituacoesDoBanco.cancelada(cobranca.getSituacaoBanco())) {
 			return SituacaoCobrancaEnum.CANCELADA;
 		}
 		return LocalDate.now().isAfter(cobranca.getDataVencimento())
