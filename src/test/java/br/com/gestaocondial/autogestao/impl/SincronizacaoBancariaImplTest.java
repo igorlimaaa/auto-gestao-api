@@ -15,6 +15,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -85,6 +86,15 @@ class SincronizacaoBancariaImplTest {
 		when(banco.listar(eq(condominio.getId()), any(), any())).thenReturn(ler("/inter/listagem.json", InterCobranca.Pagina.class).cobrancas());
 	}
 
+	/** O H2 é compartilhado entre as classes de teste: sem limpar, o que criamos vaza (ex.: endereço id 10). */
+	@AfterEach
+	void limparDados() {
+		cobrancaRepository.deleteAll();
+		unidadeRepository.deleteAll();
+		condominioRepository.deleteAll();
+		enderecoRepository.deleteAll();
+	}
+
 	@Test
 	void importaGravandoOsDadosImutaveisCasandoPorUnidadeECompetencia() {
 		sincronizacao.importar(condominio.getId());
@@ -152,6 +162,29 @@ class SincronizacaoBancariaImplTest {
 				"cobrança paga não deve ter o 'conferida em' movido pela importação");
 		assertTrue(cobrancaRepository.findById(aberta.getId()).orElseThrow().getDataUltimaSincronizacao().isAfter(antiga),
 				"cobrança em aberto continua sendo atualizada");
+	}
+
+	@Test
+	void ignoraCobrancaDeUnidadeIsentaDaTaxa() {
+		Unidade isenta = unidadeRepository.findByCondominioIdAndNumero(condominio.getId(), "1203").get(0);
+		isenta.setPercentualDescontoTaxa(new java.math.BigDecimal("100"));
+		unidadeRepository.save(isenta);
+
+		sincronizacao.importar(condominio.getId());
+
+		assertEquals(1, cobrancaRepository.count(), "só a da unidade 1404 deve ser importada");
+		assertTrue(cobrancaRepository.findByCodigoSolicitacao("c0a7aee1-f83f-4c7a-a753-c04542c3c279").isEmpty());
+	}
+
+	@Test
+	void descontoParcialNaoImpedeAImportacaoEOValorDoBancoPrevalece() {
+		Unidade metade = unidadeRepository.findByCondominioIdAndNumero(condominio.getId(), "1203").get(0);
+		metade.setPercentualDescontoTaxa(new java.math.BigDecimal("50"));
+		unidadeRepository.save(metade);
+
+		sincronizacao.importar(condominio.getId());
+
+		assertEquals(2, cobrancaRepository.count());
 	}
 
 	@Test

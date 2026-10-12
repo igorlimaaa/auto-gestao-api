@@ -2,6 +2,8 @@ package br.com.gestaocondial.autogestao.dto;
 
 import java.math.BigDecimal;
 
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -35,6 +37,14 @@ public class UnidadeDto {
 
 	@Size(max = 300)
 	private String observacao;
+
+	/** De 0 a 100; 100 isenta a unidade da taxa ordinária. Ausente mantém o valor atual. */
+	@DecimalMin(value = "0", message = "O desconto não pode ser negativo.")
+	@DecimalMax(value = "100", message = "O desconto não pode passar de 100%.")
+	private BigDecimal percentualDescontoTaxa;
+
+	@Size(max = 100)
+	private String motivoDescontoTaxa;
 
 	private Boolean ativa;
 

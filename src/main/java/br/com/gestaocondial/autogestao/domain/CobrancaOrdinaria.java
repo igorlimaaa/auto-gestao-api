@@ -48,7 +48,7 @@ public class CobrancaOrdinaria {
 	@Column(name = "dt_vencimento", nullable = false)
 	private LocalDate dataVencimento;
 
-	/** Snapshot de {@code condominio.valorTaxaCondominial} no momento da geração. */
+	/** Snapshot de {@code condominio.valorTaxaCondominial}, já com o desconto da unidade, no momento da geração. */
 	@Column(name = "vl_cobranca")
 	private Double valor;
 

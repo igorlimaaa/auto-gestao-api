@@ -60,6 +60,18 @@ public class Unidade {
 	@Column(name = "ds_observacao", length = 300)
 	private String observacao;
 
+	/**
+	 * Desconto sobre a taxa ordinária, de 0 a 100. 100 isenta a unidade (não há cobrança); 50 cobra
+	 * metade. Decisão explícita por unidade — não é derivada de quem mora nela, para que a troca
+	 * de síndico não mude a isenção sem ninguém decidir.
+	 */
+	@Column(name = "nr_percentual_desconto_taxa", nullable = false, precision = 5, scale = 2)
+	private BigDecimal percentualDescontoTaxa;
+
+	/** Por que a unidade tem desconto — ex.: "Unidade do síndico". */
+	@Column(name = "ds_motivo_desconto_taxa", length = 100)
+	private String motivoDescontoTaxa;
+
 	@Column(name = "in_ativa", nullable = false)
 	private Boolean ativa;
 
@@ -71,6 +83,14 @@ public class Unidade {
 		if (this.bloco == null) {
 			this.bloco = "";
 		}
+		if (this.percentualDescontoTaxa == null) {
+			this.percentualDescontoTaxa = BigDecimal.ZERO;
+		}
+	}
+
+	/** Desconto de 100%: a unidade não recebe cobrança da taxa ordinária. */
+	public boolean isentaDaTaxaOrdinaria() {
+		return percentualDescontoTaxa != null && percentualDescontoTaxa.compareTo(BigDecimal.valueOf(100)) >= 0;
 	}
 
 }

@@ -107,6 +107,12 @@ public class UnidadeImpl implements UnidadeService {
 		unidade.setAndar(dto.getAndar());
 		unidade.setFracaoIdeal(dto.getFracaoIdeal());
 		unidade.setObservacao(textoOuNulo(dto.getObservacao()));
+		// Ausente mantém o atual (ou 0 na criação, pelo @PrePersist): cliente que não conhece o
+		// campo não pode zerar uma isenção sem querer.
+		if (dto.getPercentualDescontoTaxa() != null) {
+			unidade.setPercentualDescontoTaxa(dto.getPercentualDescontoTaxa());
+		}
+		unidade.setMotivoDescontoTaxa(textoOuNulo(dto.getMotivoDescontoTaxa()));
 	}
 
 	private Condominio condominioDe(UnidadeDto dto) {

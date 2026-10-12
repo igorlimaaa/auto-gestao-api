@@ -111,6 +111,12 @@ As cobranças nascem no Inter (recorrência criada lá). Este serviço só **con
 - **Sem transação durante HTTP**: cada gravação é uma transação curta (`TransactionTemplate`); a
   falha de uma cobrança não derruba o lote, e 3 falhas seguidas num condomínio encerram a rodada
   dele.
+- **Desconto por unidade** (`tb_unidade.nr_percentual_desconto_taxa`, V10): 0 = taxa cheia, 50 =
+  metade, **100 = isenta** (ex.: unidade do síndico). É marca explícita na unidade, não derivada de
+  `Pessoa.isSindico`. O job de geração pula unidade isenta e aplica o desconto parcial ao valor; a
+  importação do Inter ignora (com `WARN`) cobrança de unidade isenta; para desconto parcial o valor
+  vem do banco, que prevalece. Cobrança já criada não é alterada ao marcar a isenção — para
+  removê-la: `infra/apagar-cobranca-unidade-isenta.sh`.
 - **Smoke test real** (opt-in): `INTER_SMOKE_DIR=<pasta> ./mvnw test -Dtest=InterCobrancaClientSmokeTest`.
 
 ## Segurança

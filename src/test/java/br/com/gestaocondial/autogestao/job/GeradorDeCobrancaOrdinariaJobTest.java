@@ -1,7 +1,9 @@
 package br.com.gestaocondial.autogestao.job;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
 
@@ -68,6 +70,31 @@ class GeradorDeCobrancaOrdinariaJobTest {
 		// novembro (11/11) já passaram -- a competência vigente é dezembro, não setembro.
 		assertEquals(YearMonth.of(2026, 12),
 				GeradorDeCobrancaOrdinariaJob.competenciaVigente(1, LocalDate.of(2026, 12, 1)));
+	}
+
+	@Test
+	void semDescontoMantemATaxaCheia() {
+		assertEquals(850.0, GeradorDeCobrancaOrdinariaJob.valorComDesconto(850.0, BigDecimal.ZERO));
+		assertEquals(850.0, GeradorDeCobrancaOrdinariaJob.valorComDesconto(850.0, null));
+	}
+
+	@Test
+	void descontoParcialReduzProporcionalmente() {
+		assertEquals(425.0, GeradorDeCobrancaOrdinariaJob.valorComDesconto(850.0, new BigDecimal("50")));
+		assertEquals(637.5, GeradorDeCobrancaOrdinariaJob.valorComDesconto(850.0, new BigDecimal("25.00")));
+	}
+
+	@Test
+	void descontoArredondaParaCentavos() {
+		// 100,00 com 33,33% de desconto = 66,67 (66,67 exato)
+		assertEquals(66.67, GeradorDeCobrancaOrdinariaJob.valorComDesconto(100.0, new BigDecimal("33.33")));
+		// 10,01 com 50% = 5,005 -> 5,01 (HALF_UP)
+		assertEquals(5.01, GeradorDeCobrancaOrdinariaJob.valorComDesconto(10.01, new BigDecimal("50")));
+	}
+
+	@Test
+	void semTaxaCadastradaContinuaSemValor() {
+		assertNull(GeradorDeCobrancaOrdinariaJob.valorComDesconto(null, new BigDecimal("50")));
 	}
 
 }

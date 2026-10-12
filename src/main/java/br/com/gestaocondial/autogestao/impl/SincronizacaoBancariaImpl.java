@@ -182,6 +182,11 @@ public class SincronizacaoBancariaImpl implements SincronizacaoBancariaService {
 					dados.codigoSolicitacao(), dados.seuNumero(), condominio.getId());
 			return null;
 		}
+		if (unidade.get().isentaDaTaxaOrdinaria()) {
+			log.warn("Cobrança {} (seuNumero={}) é de uma unidade isenta da taxa (condomínio {}); ignorada. "
+					+ "Cancele-a no banco.", dados.codigoSolicitacao(), dados.seuNumero(), condominio.getId());
+			return null;
+		}
 		LocalDate competencia = dados.dataVencimento().withDayOfMonth(1);
 		Optional<CobrancaOrdinaria> local = cobrancaRepository.findByUnidadeIdAndCompetencia(unidade.get().getId(),
 				competencia);

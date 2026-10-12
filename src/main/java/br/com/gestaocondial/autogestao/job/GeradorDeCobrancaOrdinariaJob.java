@@ -1,5 +1,7 @@
 package br.com.gestaocondial.autogestao.job;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.YearMonth;
 
@@ -32,6 +34,9 @@ import lombok.RequiredArgsConstructor;
  * <p>Ver {@link #competenciaVigente(int, LocalDate)}. Dar ~10 dias de antecedência ao gatilho
  * (vencimento + 10 dias) dá ao administrador tempo de preencher PIX/linha digitável antes do
  * próximo vencimento.</p>
+ *
+ * <p>Unidade com desconto de 100% ({@code Unidade.isentaDaTaxaOrdinaria}) não recebe cobrança;
+ * com desconto parcial, a cobrança nasce com a taxa menos o desconto ({@link #valorComDesconto}).</p>
  *
  * <p>Idempotente: {@code existsByUnidadeIdAndCompetencia} é conferido antes de cada insert, e a
  * constraint única {@code uk_cobranca_unidade_competencia} (migration V8) é a rede de segurança
@@ -83,6 +88,9 @@ public class GeradorDeCobrancaOrdinariaJob {
 		LocalDate vencimentoAlvo = diaNoMes(dia, mesVigente);
 
 		for (Unidade unidade : unidadeRepository.findByCondominioIdAndAtivaTrue(condominio.getId())) {
+			if (unidade.isentaDaTaxaOrdinaria()) {
+				continue;
+			}
 			if (cobrancaRepository.existsByUnidadeIdAndCompetencia(unidade.getId(), competenciaAlvo)) {
 				continue;
 			}
@@ -90,7 +98,7 @@ public class GeradorDeCobrancaOrdinariaJob {
 			cobranca.setUnidade(unidade);
 			cobranca.setCompetencia(competenciaAlvo);
 			cobranca.setDataVencimento(vencimentoAlvo);
-			cobranca.setValor(condominio.getValorTaxaCondominial());
+			cobranca.setValor(valorComDesconto(condominio.getValorTaxaCondominial(), unidade.getPercentualDescontoTaxa()));
 			cobrancaRepository.save(cobranca);
 		}
 	}
@@ -107,6 +115,15 @@ public class GeradorDeCobrancaOrdinariaJob {
 			mes = mes.plusMonths(1);
 		}
 		return mes;
+	}
+
+	/** Taxa menos o desconto da unidade, em centavos (HALF_UP). Sem taxa cadastrada, continua sem valor. */
+	static Double valorComDesconto(Double taxa, BigDecimal percentualDesconto) {
+		if (taxa == null || percentualDesconto == null || percentualDesconto.signum() == 0) {
+			return taxa;
+		}
+		BigDecimal fator = BigDecimal.valueOf(100).subtract(percentualDesconto).divide(BigDecimal.valueOf(100));
+		return BigDecimal.valueOf(taxa).multiply(fator).setScale(2, RoundingMode.HALF_UP).doubleValue();
 	}
 
 	/** Vencimento clampado ao último dia do mês-alvo — ex.: dia 31 em fevereiro vira dia 28/29. */

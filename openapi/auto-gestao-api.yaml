@@ -854,6 +854,18 @@ components:
         observacao:
           type: string
           maxLength: 300
+        percentualDescontoTaxa:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 100
+          description: >
+            Desconto sobre a taxa ordinária, de 0 a 100. `100` isenta a unidade (nenhuma cobrança é
+            gerada para ela); `50` cobra metade. Ausente mantém o valor atual.
+        motivoDescontoTaxa:
+          type: string
+          maxLength: 100
+          description: Por que a unidade tem desconto — ex. "Unidade do síndico".
         ativa:
           type: boolean
           default: true
