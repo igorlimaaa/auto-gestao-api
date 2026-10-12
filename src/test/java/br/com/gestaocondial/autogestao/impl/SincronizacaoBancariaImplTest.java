@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 
 import java.io.InputStream;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -133,6 +134,24 @@ class SincronizacaoBancariaImplTest {
 		sincronizacao.importar(condominio.getId());
 
 		assertEquals(2, cobrancaRepository.count());
+	}
+
+	@Test
+	void reimportarNaoMexeEmCobrancaJaPagaMasAtualizaAsEmAberto() {
+		sincronizacao.importar(condominio.getId());
+		LocalDateTime antiga = LocalDateTime.of(2026, 10, 1, 3, 30);
+		CobrancaOrdinaria paga = cobrancaRepository.findByCodigoSolicitacao("c0a7aee1-f83f-4c7a-a753-c04542c3c279").orElseThrow();
+		CobrancaOrdinaria aberta = cobrancaRepository.findByCodigoSolicitacao("84600ef0-5960-4618-8afa-c8a098348524").orElseThrow();
+		paga.setDataUltimaSincronizacao(antiga);
+		aberta.setDataUltimaSincronizacao(antiga);
+		cobrancaRepository.saveAll(List.of(paga, aberta));
+
+		sincronizacao.importar(condominio.getId());
+
+		assertEquals(antiga, cobrancaRepository.findById(paga.getId()).orElseThrow().getDataUltimaSincronizacao(),
+				"cobrança paga não deve ter o 'conferida em' movido pela importação");
+		assertTrue(cobrancaRepository.findById(aberta.getId()).orElseThrow().getDataUltimaSincronizacao().isAfter(antiga),
+				"cobrança em aberto continua sendo atualizada");
 	}
 
 	@Test

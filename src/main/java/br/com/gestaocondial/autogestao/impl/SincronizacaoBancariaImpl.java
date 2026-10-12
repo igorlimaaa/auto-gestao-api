@@ -154,9 +154,19 @@ public class SincronizacaoBancariaImpl implements SincronizacaoBancariaService {
 			vincular(cobranca, item);
 		} else {
 			completarImutaveis(cobranca, item);
+			if (jaResolvida(cobranca)) {
+				// Paga, cancelada ou expirada: nada mais muda no banco. Regravar só moveria o
+				// "conferida em" a cada importação diária, mesmo critério do job horário.
+				return true;
+			}
 		}
 		atualizarMutaveis(cobranca, item);
 		return true;
+	}
+
+	/** Mesmo critério de {@code findPendentesDeSincronizacao}: o que sai da reconsulta horária. */
+	private static boolean jaResolvida(CobrancaOrdinaria cobranca) {
+		return cobranca.getDataPagamento() != null || SituacoesDoBanco.finalizada(cobranca.getSituacaoBanco());
 	}
 
 	/**

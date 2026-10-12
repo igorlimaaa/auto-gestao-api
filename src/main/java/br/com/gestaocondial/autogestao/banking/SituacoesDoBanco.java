@@ -25,6 +25,10 @@ public final class SituacoesDoBanco {
 		return situacao != null && PAGAS.contains(situacao);
 	}
 
+	public static boolean finalizada(String situacao) {
+		return situacao != null && FINAIS.contains(situacao);
+	}
+
 	public static boolean cancelada(String situacao) {
 		return situacao != null && CANCELADAS.contains(situacao);
 	}
