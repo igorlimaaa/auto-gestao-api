@@ -25,14 +25,30 @@ class CondominioMapperTest {
 	CondominioDto createCondominioDto(Long id) {
 		EnderecoDto end = new EnderecoDto();
 		end.setId(ID_ENDERECO);
-		CondominioDto cond = new CondominioDto(id, DDD, TELEFONE, end, VALORJUROS, VALORMULTA, POSSUITAXA, VALORTAXA, null, null, null);
+		CondominioDto cond = new CondominioDto();
+		cond.setId(id);
+		cond.setDdd(DDD);
+		cond.setNumeroTelefone(TELEFONE);
+		cond.setEndereco(end);
+		cond.setValorJuros(VALORJUROS);
+		cond.setValorMulta(VALORMULTA);
+		cond.setPossuiTaxaExtra(POSSUITAXA);
+		cond.setValorTaxaCondominial(VALORTAXA);
 		return cond;
 	}
 	
 	Condominio createCondominioDomain(Long id) {
 		Endereco end = new Endereco();
 		end.setId(ID_ENDERECO);
-		Condominio cond = new Condominio(id, DDD.longValue(), TELEFONE, VALORTAXA, end, VALORJUROS, VALORMULTA, POSSUITAXA, null);
+		Condominio cond = new Condominio();
+		cond.setId(id);
+		cond.setDdd(DDD.longValue());
+		cond.setNumeroTelefone(TELEFONE);
+		cond.setValorTaxaCondominial(VALORTAXA);
+		cond.setEndereco(end);
+		cond.setValorJuros(VALORJUROS);
+		cond.setValorMulta(VALORMULTA);
+		cond.setPossuiTaxaExtra(POSSUITAXA);
 		return cond;
 	}
 	

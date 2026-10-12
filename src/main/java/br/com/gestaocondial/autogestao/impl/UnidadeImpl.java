@@ -105,7 +105,6 @@ public class UnidadeImpl implements UnidadeService {
 		unidade.setBloco(bloco);
 		unidade.setNumero(dto.getNumero().trim());
 		unidade.setAndar(dto.getAndar());
-		unidade.setFracaoIdeal(dto.getFracaoIdeal());
 		unidade.setObservacao(textoOuNulo(dto.getObservacao()));
 		// Ausente mantém o atual (ou 0 na criação, pelo @PrePersist): cliente que não conhece o
 		// campo não pode zerar uma isenção sem querer.

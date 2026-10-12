@@ -53,10 +53,6 @@ public class Unidade {
 	@Column(name = "nr_andar")
 	private Integer andar;
 
-	/** Participação da unidade no rateio das despesas do condomínio. */
-	@Column(name = "vl_fracao_ideal", precision = 10, scale = 6)
-	private BigDecimal fracaoIdeal;
-
 	@Column(name = "ds_observacao", length = 300)
 	private String observacao;
 

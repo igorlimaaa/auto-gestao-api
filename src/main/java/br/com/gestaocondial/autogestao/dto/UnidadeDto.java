@@ -33,6 +33,7 @@ public class UnidadeDto {
 
 	private Integer andar;
 
+	/** Calculada na leitura: 1 / quantidade de unidades do condomínio. Nunca vem do cliente. */
 	private BigDecimal fracaoIdeal;
 
 	@Size(max = 300)

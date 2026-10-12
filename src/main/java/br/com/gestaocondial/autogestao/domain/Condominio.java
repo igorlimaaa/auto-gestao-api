@@ -52,6 +52,10 @@ public class Condominio {
 	@NotNull
 	private Boolean possuiTaxaExtra;
 
+	/** Total de unidades do condomínio. Base da fração ideal de cada uma (1 / quantidade). */
+	@Column(name = "nr_unidades")
+	private Integer quantidadeUnidades;
+
 	/** Base para a geração mensal de {@code CobrancaOrdinaria} e para marcar inadimplência. */
 	@Column(name = "nr_dia_vencimento_taxa_ordinaria")
 	private Integer diaVencimentoTaxaOrdinaria;

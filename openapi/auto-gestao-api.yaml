@@ -850,7 +850,11 @@ components:
         fracaoIdeal:
           type: number
           format: double
-          description: Participação da unidade no rateio das despesas.
+          readOnly: true
+          description: >
+            Participação da unidade no rateio das despesas, calculada pelo servidor como
+            1 / `quantidadeUnidades` do condomínio (6 casas). Ausente enquanto o condomínio não
+            informar a quantidade de unidades. Valor enviado pelo cliente é ignorado.
         observacao:
           type: string
           maxLength: 300
@@ -910,6 +914,12 @@ components:
           description: >
             Dia do mês em que a taxa ordinária vence. Base para a geração mensal das cobranças
             (ver `CobrancaOrdinaria`) e para marcar uma unidade como inadimplente.
+        quantidadeUnidades:
+          type: integer
+          format: int32
+          minimum: 1
+          description: >
+            Total de unidades do condomínio. Base da `fracaoIdeal` de cada unidade (1 / quantidade).
         valorTaxasExtras:
           type: number
           format: double
