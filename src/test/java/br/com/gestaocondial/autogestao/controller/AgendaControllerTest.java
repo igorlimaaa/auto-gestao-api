@@ -37,6 +37,7 @@ import br.com.gestaocondial.autogestao.domain.Condominio;
 import br.com.gestaocondial.autogestao.domain.Endereco;
 import br.com.gestaocondial.autogestao.domain.Pessoa;
 import br.com.gestaocondial.autogestao.domain.Unidade;
+import br.com.gestaocondial.autogestao.enumeration.ModoDeReservaEnum;
 import br.com.gestaocondial.autogestao.repository.AreaComumRepository;
 import br.com.gestaocondial.autogestao.repository.CondominioRepository;
 import br.com.gestaocondial.autogestao.repository.EnderecoRepository;
@@ -85,6 +86,8 @@ class AgendaControllerTest {
 
 	private AreaComum elevador;
 
+	private AreaComum festas;
+
 	@BeforeEach
 	void prepararCenario() {
 		Condominio novo = new Condominio();
@@ -96,6 +99,9 @@ class AgendaControllerTest {
 		pessoa(MORADOR_102, unidade("102"));
 		salao = area("Salão de festas", true, LocalTime.of(8, 0), LocalTime.of(22, 0));
 		elevador = area("Elevador de serviço", false, null, null);
+		festas = area("Salão de eventos", true, null, null);
+		festas.setModoDeReserva(ModoDeReservaEnum.DIA_INTEIRO);
+		areaRepository.save(festas);
 	}
 
 	@AfterEach
@@ -255,6 +261,59 @@ class AgendaControllerTest {
 		criarReserva(morador(MORADOR_101), amanha(14), amanha(18), "Festa").andExpect(status().isBadRequest());
 	}
 
+	// ------------------------------------------------------------------ área reservada pelo dia inteiro
+
+	@Test
+	void salaoDeDiaInteiroEReservadoSoPelaData() throws Exception {
+		criarDiaInteiro(morador(MORADOR_101), festas, 3, "Casamento")
+				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.situacao").value("PENDENTE"))
+				.andExpect(jsonPath("$.diaInteiro").value(true));
+	}
+
+	@Test
+	void doisMoradoresNaoReservamOSalaoNoMesmoDia() throws Exception {
+		criarDiaInteiro(sindico(), festas, 3, "Festa A").andExpect(status().isCreated());
+		criarDiaInteiro(morador(MORADOR_101), festas, 3, "Festa B").andExpect(status().isConflict());
+		// O dia seguinte está livre: o que fecha é o dia, não a semana.
+		criarDiaInteiro(morador(MORADOR_101), festas, 4, "Festa B").andExpect(status().isCreated());
+	}
+
+	@Test
+	void pedidoPendenteNaoTravaODiaMasAprovarUmDeixaOOutroSemPoderSerAprovado() throws Exception {
+		criarDiaInteiro(morador(MORADOR_101), festas, 3, "Festa A").andExpect(status().isCreated());
+		criarDiaInteiro(morador(MORADOR_102), festas, 3, "Festa B").andExpect(status().isCreated());
+		List<Long> ids = eventoRepository.findAll().stream().map(e -> e.getId()).toList();
+
+		decidir(sindico(), ids.get(0), true, null).andExpect(status().isOk());
+		decidir(sindico(), ids.get(1), true, null).andExpect(status().isConflict());
+	}
+
+	@Test
+	void manutencaoNoSalaoNaquelaDataBarraAReservaDoDiaInteiro() throws Exception {
+		criar(sindico(), "MANUTENCAO", festas, amanha(9), amanha(12), "Pintura").andExpect(status().isCreated());
+		criarDiaInteiro(morador(MORADOR_101), festas, 1, "Festa").andExpect(status().isConflict());
+	}
+
+	@Test
+	void reservaDeDiaInteiroNaoAceitaHorarioNemVariosDiasNemPassado() throws Exception {
+		criarReservaDeHorario(festas, amanha(14), amanha(18)).andExpect(status().isBadRequest());
+		criar(morador(MORADOR_101), "RESERVA_AREA", festas, amanha(0), amanha(0).plusDays(2), "Dois dias")
+				.andExpect(status().isBadRequest());
+		criar(morador(MORADOR_101), "RESERVA_AREA", festas, LocalDate.now().minusDays(2).atStartOfDay(),
+				LocalDate.now().minusDays(1).atStartOfDay(), "Passado").andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void areaDeDiaInteiroNaoGuardaHorarioDeFuncionamento() throws Exception {
+		mockMvc.perform(post("/areaComum").with(sindico()).contentType(MediaType.APPLICATION_JSON)
+				.content("{\"nome\":\"Espaço gourmet\",\"reservavel\":true,\"modoDeReserva\":\"DIA_INTEIRO\","
+						+ "\"horaAbertura\":\"08:00\",\"horaFechamento\":\"22:00\"}"))
+				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.modoDeReserva").value("DIA_INTEIRO"))
+				.andExpect(jsonPath("$.horaAbertura").doesNotExist());
+	}
+
 	// ------------------------------------------------------------------ cancelar
 
 	@Test
@@ -312,10 +371,27 @@ class AgendaControllerTest {
 		return criar(quem, "RESERVA_AREA", salao, inicio, fim, titulo);
 	}
 
+	private ResultActions criarDiaInteiro(RequestPostProcessor quem, AreaComum area, int diasAdiante, String titulo)
+			throws Exception {
+		LocalDateTime dia = LocalDate.now().plusDays(diasAdiante).atStartOfDay();
+		return criar(quem, "RESERVA_AREA", area, dia, dia.plusDays(1), titulo, true);
+	}
+
+	private ResultActions criarReservaDeHorario(AreaComum area, LocalDateTime inicio, LocalDateTime fim)
+			throws Exception {
+		return criar(morador(MORADOR_101), "RESERVA_AREA", area, inicio, fim, "Por horário");
+	}
+
 	private ResultActions criar(RequestPostProcessor quem, String tipo, AreaComum area, LocalDateTime inicio,
 			LocalDateTime fim, String titulo) throws Exception {
-		String corpo = "{\"tipo\":\"%s\",\"titulo\":\"%s\",\"inicio\":\"%s\",\"fim\":\"%s\"%s}".formatted(tipo, titulo,
-				iso(inicio), iso(fim), area == null ? "" : ",\"idAreaComum\":" + area.getId());
+		return criar(quem, tipo, area, inicio, fim, titulo, false);
+	}
+
+	private ResultActions criar(RequestPostProcessor quem, String tipo, AreaComum area, LocalDateTime inicio,
+			LocalDateTime fim, String titulo, boolean diaInteiro) throws Exception {
+		String corpo = "{\"tipo\":\"%s\",\"titulo\":\"%s\",\"inicio\":\"%s\",\"fim\":\"%s\",\"diaInteiro\":%s%s}"
+				.formatted(tipo, titulo, iso(inicio), iso(fim), diaInteiro,
+						area == null ? "" : ",\"idAreaComum\":" + area.getId());
 		return mockMvc.perform(post("/evento").with(quem).contentType(MediaType.APPLICATION_JSON).content(corpo));
 	}
 

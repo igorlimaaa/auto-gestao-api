@@ -12,6 +12,7 @@ import br.com.gestaocondial.autogestao.config.EscopoDoCondominio;
 import br.com.gestaocondial.autogestao.domain.AreaComum;
 import br.com.gestaocondial.autogestao.domain.Condominio;
 import br.com.gestaocondial.autogestao.dto.AreaComumDto;
+import br.com.gestaocondial.autogestao.enumeration.ModoDeReservaEnum;
 import br.com.gestaocondial.autogestao.exception.AreaComumJaExisteException;
 import br.com.gestaocondial.autogestao.exception.AreaComumNaoEncontradaException;
 import br.com.gestaocondial.autogestao.exception.CondominioNaoEncontradoException;
@@ -95,6 +96,7 @@ public class AreaComumImpl implements AreaComumService {
 	}
 
 	private void aplicar(AreaComum area, AreaComumDto dto) {
+		boolean diaInteiro = dto.getModoDeReserva() == ModoDeReservaEnum.DIA_INTEIRO;
 		if ((dto.getHoraAbertura() == null) != (dto.getHoraFechamento() == null)) {
 			throw new IllegalArgumentException("Informe a abertura e o fechamento, ou nenhum dos dois.");
 		}
@@ -105,9 +107,11 @@ public class AreaComumImpl implements AreaComumService {
 		area.setNome(dto.getNome().trim());
 		area.setDescricao(dto.getDescricao() == null || dto.getDescricao().isBlank() ? null : dto.getDescricao().trim());
 		area.setReservavel(Boolean.TRUE.equals(dto.getReservavel()));
+		area.setModoDeReserva(diaInteiro ? ModoDeReservaEnum.DIA_INTEIRO : ModoDeReservaEnum.POR_HORARIO);
 		area.setCapacidade(dto.getCapacidade());
-		area.setHoraAbertura(dto.getHoraAbertura());
-		area.setHoraFechamento(dto.getHoraFechamento());
+		// Reserva de dia inteiro ignora o horário de funcionamento: guardar um deixaria a regra ambígua.
+		area.setHoraAbertura(diaInteiro ? null : dto.getHoraAbertura());
+		area.setHoraFechamento(diaInteiro ? null : dto.getHoraFechamento());
 		if (dto.getAtiva() != null) {
 			area.setAtiva(dto.getAtiva());
 		}

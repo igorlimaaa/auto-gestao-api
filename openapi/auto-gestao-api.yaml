@@ -1290,6 +1290,14 @@ components:
           type: boolean
           default: false
           description: Verdadeiro se os moradores podem reservar a área. Elevador e hall, por exemplo, não.
+        modoDeReserva:
+          type: string
+          enum: [POR_HORARIO, DIA_INTEIRO]
+          default: POR_HORARIO
+          description: >
+            `POR_HORARIO`: faixas de horário dentro do funcionamento da área, várias por dia se não se
+            cruzarem. `DIA_INTEIRO`: uso exclusivo do dia (salão de festas, que pede limpeza depois) — uma
+            reserva por dia, sem horário; `horaAbertura`/`horaFechamento` são ignorados.
         capacidade:
           type: integer
           format: int32

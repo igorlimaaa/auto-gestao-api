@@ -154,6 +154,9 @@ As cobranças nascem no Inter (recorrência criada lá). Este serviço só **con
   `reservavel` e `ativa`, dentro de `horaAbertura`/`horaFechamento`, no futuro, no mesmo dia, e sem
   sobrepor `RESERVA_AREA`/`MANUTENCAO` aprovada da mesma área (409; reconferido ao aprovar). Intervalos
   são semiabertos (`fim` exclusivo). A resposta já traz `ehMeu`/`podeEditar`/`podeCancelar`/`podeDecidir`.
+  Cada área tem `modoDeReserva`: `POR_HORARIO` (faixas, várias por dia se não se cruzarem) ou
+  `DIA_INTEIRO` (uso exclusivo do dia — salão de festas; uma reserva por dia, só a data, sem horário de
+  funcionamento; hoje ou futura; V15). Só reserva **aprovada** (ou manutenção) fecha o dia.
   Catálogo de áreas é do síndico (`AREA_ESCREVER`); o morador só escolhe. Permissões na V7 do
   oauth-service.
 - **Saldo da conta** (`GET /saldoBancario`, `SaldoImpl`): consulta `GET /banking/v2/saldo` do Inter

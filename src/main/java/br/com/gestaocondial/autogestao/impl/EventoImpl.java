@@ -21,6 +21,7 @@ import br.com.gestaocondial.autogestao.domain.Evento;
 import br.com.gestaocondial.autogestao.domain.Pessoa;
 import br.com.gestaocondial.autogestao.domain.Unidade;
 import br.com.gestaocondial.autogestao.dto.EventoDto;
+import br.com.gestaocondial.autogestao.enumeration.ModoDeReservaEnum;
 import br.com.gestaocondial.autogestao.enumeration.SituacaoEventoEnum;
 import br.com.gestaocondial.autogestao.enumeration.TipoEventoEnum;
 import br.com.gestaocondial.autogestao.exception.AcessoNegadoException;
@@ -221,6 +222,29 @@ public class EventoImpl implements EventoService {
 		if (!Boolean.TRUE.equals(area.getReservavel())) {
 			throw new IllegalArgumentException("A área \"" + area.getNome() + "\" não aceita reservas.");
 		}
+		if (area.getModoDeReserva() == ModoDeReservaEnum.DIA_INTEIRO) {
+			validarReservaDeDiaInteiro(evento, area);
+		} else {
+			validarReservaPorHorario(evento, area);
+		}
+	}
+
+	/** Uso exclusivo do dia: um único dia, sem horário. A sobreposição é barrada por {@link #exigirAreaLivre}. */
+	private void validarReservaDeDiaInteiro(Evento evento, AreaComum area) {
+		LocalDate dia = evento.getInicio().toLocalDate();
+		boolean umDiaCompleto = LocalTime.MIDNIGHT.equals(evento.getInicio().toLocalTime())
+				&& evento.getFim().equals(dia.plusDays(1).atStartOfDay());
+		if (!umDiaCompleto) {
+			throw new IllegalArgumentException(
+					"A área \"" + area.getNome() + "\" é reservada pelo dia inteiro: escolha apenas a data.");
+		}
+		if (dia.isBefore(LocalDate.now())) {
+			throw new IllegalArgumentException("A reserva precisa ser para hoje ou uma data futura.");
+		}
+		evento.setDiaInteiro(true);
+	}
+
+	private void validarReservaPorHorario(Evento evento, AreaComum area) {
 		if (Boolean.TRUE.equals(evento.getDiaInteiro())) {
 			throw new IllegalArgumentException("Reserva de área precisa de horário de início e de fim.");
 		}

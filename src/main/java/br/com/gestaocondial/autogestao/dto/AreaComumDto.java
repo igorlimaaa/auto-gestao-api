@@ -6,6 +6,8 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
+import br.com.gestaocondial.autogestao.enumeration.ModoDeReservaEnum;
+
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -30,6 +32,9 @@ public class AreaComumDto {
 	private String descricao;
 
 	private Boolean reservavel;
+
+	/** Ausente vale por horário. */
+	private ModoDeReservaEnum modoDeReserva;
 
 	@Min(value = 1, message = "A capacidade deve ser de pelo menos 1 pessoa.")
 	private Integer capacidade;

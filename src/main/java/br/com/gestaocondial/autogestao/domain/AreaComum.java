@@ -5,6 +5,8 @@ import java.time.LocalTime;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
@@ -12,6 +14,8 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+
+import br.com.gestaocondial.autogestao.enumeration.ModoDeReservaEnum;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -50,6 +54,11 @@ public class AreaComum {
 	@Column(name = "in_reservavel", nullable = false)
 	private Boolean reservavel = false;
 
+	/** Por horário ou dia inteiro. No dia inteiro o horário de funcionamento não se aplica. */
+	@Enumerated(EnumType.STRING)
+	@Column(name = "tp_reserva", nullable = false, length = 20)
+	private ModoDeReservaEnum modoDeReserva = ModoDeReservaEnum.POR_HORARIO;
+
 	@Column(name = "nr_capacidade")
 	private Integer capacidade;
 
@@ -71,6 +80,9 @@ public class AreaComum {
 		this.dataCadastro = LocalDateTime.now();
 		if (this.reservavel == null) {
 			this.reservavel = false;
+		}
+		if (this.modoDeReserva == null) {
+			this.modoDeReserva = ModoDeReservaEnum.POR_HORARIO;
 		}
 		if (this.ativa == null) {
 			this.ativa = true;
