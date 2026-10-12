@@ -147,6 +147,15 @@ As cobranças nascem no Inter (recorrência criada lá). Este serviço só **con
   restringida — os endpoints nunca chegam aqui sem token. As permissões `MORADOR_LER` e
   `COBRANCA_LER` do papel MORADOR vêm da migration V6 do oauth-service. Taxas Extra (`TAXA_LER`) o
   morador continua vendo inteira (é do condomínio, não pessoal).
+- **Agenda** (`Evento`, `AreaComum`; `EventoImpl`, `AreaComumImpl`): reunião, reserva de área, evento
+  social, manutenção. **Morador gera `PENDENTE`; os demais, `APROVADO`.** Decide quem tem
+  `EVENTO_APROVAR` (síndico e administrador). Todos veem os aprovados; pendentes/recusados/cancelados
+  só o autor e quem aprova — e só eles veem o solicitante. Reserva (`RESERVA_AREA`) exige área
+  `reservavel` e `ativa`, dentro de `horaAbertura`/`horaFechamento`, no futuro, no mesmo dia, e sem
+  sobrepor `RESERVA_AREA`/`MANUTENCAO` aprovada da mesma área (409; reconferido ao aprovar). Intervalos
+  são semiabertos (`fim` exclusivo). A resposta já traz `ehMeu`/`podeEditar`/`podeCancelar`/`podeDecidir`.
+  Catálogo de áreas é do síndico (`AREA_ESCREVER`); o morador só escolhe. Permissões na V7 do
+  oauth-service.
 - **Smoke test real** (opt-in): `INTER_SMOKE_DIR=<pasta> ./mvnw test -Dtest=InterCobrancaClientSmokeTest`.
 
 ## Segurança
