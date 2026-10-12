@@ -211,6 +211,15 @@ class MoradorSoVeOProprioTest {
 				.andExpect(jsonPath("$.length()").value(2));
 	}
 
+	// ------------------------------------------------------------------ taxas extras
+
+	@Test
+	void moradorListaAsTaxasExtrasDoCondominio() throws Exception {
+		// Nota: o 403 de /condominio para o morador (sem CONDOMINIO_LER) não dá para provar aqui,
+		// porque o profile de teste desliga a segurança de método. Vem da V2 do oauth-service.
+		mockMvc.perform(get("/condominio/taxaExtra").with(morador(EMAIL_101))).andExpect(status().isOk());
+	}
+
 	// ------------------------------------------------------------------ apoio
 
 	private RequestPostProcessor morador(String email) {
@@ -228,7 +237,7 @@ class MoradorSoVeOProprioTest {
 				.claim("condominio", condominio.getId()).build();
 		JwtAuthenticationToken autenticacao = new JwtAuthenticationToken(token,
 				List.of(new SimpleGrantedAuthority("UNIDADE_LER"), new SimpleGrantedAuthority("MORADOR_LER"),
-						new SimpleGrantedAuthority("COBRANCA_LER")));
+						new SimpleGrantedAuthority("COBRANCA_LER"), new SimpleGrantedAuthority("TAXA_LER")));
 		return request -> {
 			SecurityContextHolder.getContext().setAuthentication(autenticacao);
 			return request;
