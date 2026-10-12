@@ -7,7 +7,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
+import br.com.gestaocondial.autogestao.config.AlcanceDoPerfil;
 import br.com.gestaocondial.autogestao.domain.MeioContato;
+import br.com.gestaocondial.autogestao.exception.AcessoNegadoException;
 import br.com.gestaocondial.autogestao.domain.Pessoa;
 import org.springframework.data.jpa.domain.Specification;
 
@@ -38,6 +40,8 @@ public class PessoaImpl implements PessoaService {
 
 	private final UnidadeRepository unidadeRepository;
 
+	private final AlcanceDoPerfil alcanceDoPerfil;
+
 	@Override
 	@Transactional
 	public PessoaDto createNewPessoa(PessoaDto pessoa) {
@@ -51,7 +55,7 @@ public class PessoaImpl implements PessoaService {
 	@Transactional(readOnly = true)
 	public List<PessoaDto> findPessoasEnvioEmail(Long idCondominio) {
 		List<Pessoa> listPessoa = pessoaRepository.findByCondominioIdAndEnvioTaxaEmail(idCondominio, true);
-		return mapper.listPessoaDomainToDto(listPessoa);
+		return mapper.listPessoaDomainToDto(visiveis(listPessoa));
 	}
 
 	@Override
@@ -65,7 +69,7 @@ public class PessoaImpl implements PessoaService {
 	@Override
 	@Transactional(readOnly = true)
 	public List<PessoaDto> findPessoas() {
-		return mapper.listPessoaDomainToDto(pessoaRepository.findAll());
+		return mapper.listPessoaDomainToDto(visiveis(pessoaRepository.findAll()));
 	}
 
 	@Override
@@ -73,7 +77,11 @@ public class PessoaImpl implements PessoaService {
 	public PessoaDto findPessoaId(Long idPessoa) {
 		// Lanca em vez de devolver null: quem chama precisa do condominio do morador para a
 		// checagem de escopo, e um null ali viraria NullPointerException em vez de 404.
-		return mapper.pessoaDomainToDto(pessoaPorId(idPessoa));
+		Pessoa pessoa = pessoaPorId(idPessoa);
+		if (!alcanceDoPerfil.alcance().podeVerPessoa(pessoa.getId())) {
+			throw new AcessoNegadoException("Você só pode ver o seu próprio cadastro.");
+		}
+		return mapper.pessoaDomainToDto(pessoa);
 	}
 
 	@Override
@@ -85,7 +93,7 @@ public class PessoaImpl implements PessoaService {
 				PessoaSpecifications.semUnidade(semUnidade),
 				PessoaSpecifications.comBusca(busca));
 
-		return mapper.listPessoaDomainToDto(pessoaRepository.findAll(filtro));
+		return mapper.listPessoaDomainToDto(visiveis(pessoaRepository.findAll(filtro)));
 	}
 
 	@Override
@@ -134,7 +142,13 @@ public class PessoaImpl implements PessoaService {
 	@Override
 	@Transactional(readOnly = true)
 	public List<PessoaDto> findPessoasCondominioId(Long idCondominio) {
-		return mapper.listPessoaDomainToDto(pessoaRepository.findByCondominioId(idCondominio));
+		return mapper.listPessoaDomainToDto(visiveis(pessoaRepository.findByCondominioId(idCondominio)));
+	}
+
+	/** Um morador só enxerga o próprio cadastro; os demais perfis, todos os do condomínio. */
+	private List<Pessoa> visiveis(List<Pessoa> pessoas) {
+		AlcanceDoPerfil.Alcance alcance = alcanceDoPerfil.alcance();
+		return pessoas.stream().filter(pessoa -> alcance.podeVerPessoa(pessoa.getId())).toList();
 	}
 
 }

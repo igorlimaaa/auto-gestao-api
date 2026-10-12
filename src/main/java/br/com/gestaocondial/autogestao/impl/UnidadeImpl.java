@@ -8,9 +8,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
+import br.com.gestaocondial.autogestao.config.AlcanceDoPerfil;
 import br.com.gestaocondial.autogestao.domain.Condominio;
 import br.com.gestaocondial.autogestao.domain.Unidade;
 import br.com.gestaocondial.autogestao.dto.UnidadeDto;
+import br.com.gestaocondial.autogestao.exception.AcessoNegadoException;
 import br.com.gestaocondial.autogestao.exception.CondominioNaoEncontradoException;
 import br.com.gestaocondial.autogestao.exception.RecursoEmUsoException;
 import br.com.gestaocondial.autogestao.exception.UnidadeJaExisteException;
@@ -37,6 +39,8 @@ public class UnidadeImpl implements UnidadeService {
 
 	private final UnidadeMapper mapper;
 
+	private final AlcanceDoPerfil alcanceDoPerfil;
+
 	@Override
 	@Transactional(readOnly = true)
 	public List<UnidadeDto> listUnidades(Long idCondominio, Boolean ativa, String busca) {
@@ -45,13 +49,21 @@ public class UnidadeImpl implements UnidadeService {
 				UnidadeSpecifications.comAtiva(ativa),
 				UnidadeSpecifications.comBusca(busca));
 
-		return unidadeRepository.findAll(filtro).stream().map(this::comContagemDeMoradores).toList();
+		AlcanceDoPerfil.Alcance alcance = alcanceDoPerfil.alcance();
+		return unidadeRepository.findAll(filtro).stream()
+				.filter(unidade -> alcance.podeVerUnidade(unidade.getId()))
+				.map(this::comContagemDeMoradores)
+				.toList();
 	}
 
 	@Override
 	@Transactional(readOnly = true)
 	public UnidadeDto findUnidade(Long idUnidade) {
-		return comContagemDeMoradores(porId(idUnidade));
+		Unidade unidade = porId(idUnidade);
+		if (!alcanceDoPerfil.alcance().podeVerUnidade(unidade.getId())) {
+			throw new AcessoNegadoException("Você só pode ver a sua própria unidade.");
+		}
+		return comContagemDeMoradores(unidade);
 	}
 
 	@Override

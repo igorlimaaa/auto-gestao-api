@@ -133,11 +133,20 @@ As cobranças nascem no Inter (recorrência criada lá). Este serviço só **con
 - **Boleto em PDF** (`GET /cobrancaOrdinaria/{id}/pdf`, `BoletoImpl`): busca no Inter **a cada clique**
   e não guarda nada. O Inter devolve JSON `{"pdf": base64}`; aqui sai decodificado, `application/pdf`
   inline, `no-store`. Só para cobrança vinda do banco e em aberto (409 nas demais). Quem abre
-  (`AcessoAoBoleto`): administrador e síndico (tipo de perfil ou papel) qualquer unidade do alcance;
+  (`AlcanceDoPerfil`): administrador e síndico (tipo de perfil ou papel) qualquer unidade do alcance;
   os demais só a **própria unidade**, achada pelo e-mail do token (`sub`) no cadastro de moradores.
   A lista traz `podeVerBoleto` já calculado, e o frontend só mostra o ícone quando é `true`.
   Falha do Inter vira 502 com mensagem fixa (a causa fica só no log). O proxy `/api/backend` do
   frontend lê o corpo como texto, por isso o PDF passa por rota própria (`/api/cobrancas/{id}/pdf`).
+- **Morador só vê o que é seu** (`AlcanceDoPerfil.Alcance.apenasProprio`): perfil de tipo `MORADOR`
+  (sem papel de síndico/administrador) recebe, em listas e detalhes, só a **própria unidade**, o
+  **próprio cadastro** (`Pessoa` achada pelo e-mail do token) e as **cobranças da própria unidade**;
+  detalhe de registro alheio dá 403, lista dá vazio. Aplicado nos services (`UnidadeImpl`,
+  `PessoaImpl`, `CobrancaOrdinariaImpl`), não nos controllers. Os demais tipos (síndico, subsíndico,
+  financeiro, portaria...) seguem vendo o condomínio inteiro. Chamada sem JWT (job/teste) não é
+  restringida — os endpoints nunca chegam aqui sem token. As permissões `MORADOR_LER` e
+  `COBRANCA_LER` do papel MORADOR vêm da migration V6 do oauth-service. Taxas Extra (`TAXA_LER`) o
+  morador continua vendo inteira (é do condomínio, não pessoal).
 - **Smoke test real** (opt-in): `INTER_SMOKE_DIR=<pasta> ./mvnw test -Dtest=InterCobrancaClientSmokeTest`.
 
 ## Segurança

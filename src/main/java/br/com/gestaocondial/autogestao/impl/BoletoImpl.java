@@ -3,7 +3,7 @@ package br.com.gestaocondial.autogestao.impl;
 import org.springframework.stereotype.Service;
 
 import br.com.gestaocondial.autogestao.banking.InterCobrancaClient;
-import br.com.gestaocondial.autogestao.config.AcessoAoBoleto;
+import br.com.gestaocondial.autogestao.config.AlcanceDoPerfil;
 import br.com.gestaocondial.autogestao.config.EscopoDoCondominio;
 import br.com.gestaocondial.autogestao.domain.CobrancaOrdinaria;
 import br.com.gestaocondial.autogestao.domain.Unidade;
@@ -26,7 +26,7 @@ public class BoletoImpl implements BoletoService {
 
 	private final InterCobrancaClient banco;
 
-	private final AcessoAoBoleto acessoAoBoleto;
+	private final AlcanceDoPerfil alcanceDoPerfil;
 
 	private final EscopoDoCondominio escopoDoCondominio;
 
@@ -38,7 +38,7 @@ public class BoletoImpl implements BoletoService {
 		Unidade unidade = cobranca.getUnidade();
 
 		escopoDoCondominio.exigirAcesso(unidade.getCondominio().getId());
-		if (!acessoAoBoleto.alcance().podeVer(unidade.getId())) {
+		if (!alcanceDoPerfil.alcance().podeVer(unidade.getId())) {
 			throw new AcessoNegadoException("Você só pode ver o boleto da sua própria unidade.");
 		}
 		if (cobranca.getCodigoSolicitacao() == null) {

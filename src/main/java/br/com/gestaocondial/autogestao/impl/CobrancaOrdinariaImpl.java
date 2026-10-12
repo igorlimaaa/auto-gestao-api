@@ -9,10 +9,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import br.com.gestaocondial.autogestao.domain.CobrancaOrdinaria;
 import br.com.gestaocondial.autogestao.banking.SituacoesDoBanco;
-import br.com.gestaocondial.autogestao.config.AcessoAoBoleto;
+import br.com.gestaocondial.autogestao.config.AlcanceDoPerfil;
 import br.com.gestaocondial.autogestao.dto.CobrancaBancoPendenteDto;
 import br.com.gestaocondial.autogestao.dto.CobrancaOrdinariaDto;
 import br.com.gestaocondial.autogestao.enumeration.SituacaoCobrancaEnum;
+import br.com.gestaocondial.autogestao.exception.AcessoNegadoException;
 import br.com.gestaocondial.autogestao.exception.CobrancaOrdinariaNaoEncontradaException;
 import br.com.gestaocondial.autogestao.mapper.CobrancaOrdinariaMapper;
 import br.com.gestaocondial.autogestao.repository.CobrancaBancoPendenteRepository;
@@ -30,7 +31,7 @@ public class CobrancaOrdinariaImpl implements CobrancaOrdinariaService {
 
 	private final CobrancaOrdinariaMapper mapper;
 
-	private final AcessoAoBoleto acessoAoBoleto;
+	private final AlcanceDoPerfil alcanceDoPerfil;
 
 	private final CobrancaBancoPendenteRepository pendenciaRepository;
 
@@ -42,14 +43,17 @@ public class CobrancaOrdinariaImpl implements CobrancaOrdinariaService {
 				CobrancaOrdinariaSpecifications.doUnidade(idUnidade),
 				CobrancaOrdinariaSpecifications.daCompetencia(competencia));
 
-		AcessoAoBoleto.Alcance alcance = acessoAoBoleto.alcance();
-		return cobrancaRepository.findAll(filtro).stream().map(c -> comSituacao(c, alcance)).toList();
+		AlcanceDoPerfil.Alcance alcance = alcanceDoPerfil.alcance();
+		return cobrancaRepository.findAll(filtro).stream()
+				.filter(c -> alcance.podeVerUnidade(c.getUnidade().getId()))
+				.map(c -> comSituacao(c, alcance))
+				.toList();
 	}
 
 	@Override
 	@Transactional(readOnly = true)
 	public List<CobrancaBancoPendenteDto> listPendenciasDoBanco(Long idCondominio) {
-		if (!acessoAoBoleto.alcance().amplo()) {
+		if (!alcanceDoPerfil.alcance().amplo()) {
 			return List.of();
 		}
 		return (idCondominio == null
@@ -63,7 +67,12 @@ public class CobrancaOrdinariaImpl implements CobrancaOrdinariaService {
 	@Override
 	@Transactional(readOnly = true)
 	public CobrancaOrdinariaDto findCobranca(Long idCobrancaOrdinaria) {
-		return comSituacao(porId(idCobrancaOrdinaria), acessoAoBoleto.alcance());
+		CobrancaOrdinaria cobranca = porId(idCobrancaOrdinaria);
+		AlcanceDoPerfil.Alcance alcance = alcanceDoPerfil.alcance();
+		if (!alcance.podeVerUnidade(cobranca.getUnidade().getId())) {
+			throw new AcessoNegadoException("Você só pode ver as cobranças da sua própria unidade.");
+		}
+		return comSituacao(cobranca, alcance);
 	}
 
 	@Override
@@ -73,7 +82,7 @@ public class CobrancaOrdinariaImpl implements CobrancaOrdinariaService {
 		CobrancaOrdinaria cobranca = porId(idCobrancaOrdinaria);
 		cobranca.setPixCopiaCola(textoOuNulo(pixCopiaCola));
 		cobranca.setLinhaDigitavel(textoOuNulo(linhaDigitavel));
-		return comSituacao(cobrancaRepository.save(cobranca), acessoAoBoleto.alcance());
+		return comSituacao(cobrancaRepository.save(cobranca), alcanceDoPerfil.alcance());
 	}
 
 	@Override
@@ -81,7 +90,7 @@ public class CobrancaOrdinariaImpl implements CobrancaOrdinariaService {
 	public CobrancaOrdinariaDto registrarPagamento(Long idCobrancaOrdinaria, LocalDate dataPagamento) {
 		CobrancaOrdinaria cobranca = porId(idCobrancaOrdinaria);
 		cobranca.setDataPagamento(dataPagamento != null ? dataPagamento : LocalDate.now());
-		return comSituacao(cobrancaRepository.save(cobranca), acessoAoBoleto.alcance());
+		return comSituacao(cobrancaRepository.save(cobranca), alcanceDoPerfil.alcance());
 	}
 
 	private CobrancaOrdinaria porId(Long idCobrancaOrdinaria) {
@@ -90,7 +99,7 @@ public class CobrancaOrdinariaImpl implements CobrancaOrdinariaService {
 						"Cobrança " + idCobrancaOrdinaria + " não encontrada."));
 	}
 
-	private CobrancaOrdinariaDto comSituacao(CobrancaOrdinaria cobranca, AcessoAoBoleto.Alcance alcance) {
+	private CobrancaOrdinariaDto comSituacao(CobrancaOrdinaria cobranca, AlcanceDoPerfil.Alcance alcance) {
 		CobrancaOrdinariaDto dto = mapper.cobrancaOrdinariaDomainToDto(cobranca);
 		SituacaoCobrancaEnum situacao = calcularSituacao(cobranca);
 		dto.setSituacao(situacao);

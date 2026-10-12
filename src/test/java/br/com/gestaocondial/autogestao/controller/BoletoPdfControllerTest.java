@@ -224,11 +224,12 @@ class BoletoPdfControllerTest {
 				.andExpect(jsonPath("$[?(@.id == " + aberta102.getId() + ")].podeVerBoleto").value(true))
 				.andExpect(jsonPath("$[?(@.id == " + paga.getId() + ")].podeVerBoleto").value(false));
 
-		// Morador da 101: só a própria, em aberto.
+		// Morador da 101: a lista traz só as cobranças da própria unidade (a paga e a em aberto).
 		mockMvc.perform(get("/cobrancaOrdinaria").with(morador("morador101@teste.com", condominio.getId())))
 				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.length()").value(2))
 				.andExpect(jsonPath("$[?(@.id == " + aberta101.getId() + ")].podeVerBoleto").value(true))
-				.andExpect(jsonPath("$[?(@.id == " + aberta102.getId() + ")].podeVerBoleto").value(false));
+				.andExpect(jsonPath("$[?(@.id == " + aberta102.getId() + ")]").isEmpty());
 	}
 
 	// ------------------------------------------------------------------ pendências do banco
@@ -277,7 +278,7 @@ class BoletoPdfControllerTest {
 	/**
 	 * No profile de teste o autoconfigure de segurança está desligado (application-test.properties),
 	 * então não há filtro que leia o {@code jwt()} do MockMvc: a autenticação é instalada direto no
-	 * {@code SecurityContextHolder}, que é o que {@code EscopoDoCondominio} e {@code AcessoAoBoleto} leem.
+	 * {@code SecurityContextHolder}, que é o que {@code EscopoDoCondominio} e {@code AlcanceDoPerfil} leem.
 	 */
 	private static RequestPostProcessor perfil(String email, String tipo, Long idCondominio, List<String> papeis) {
 		Jwt.Builder token = Jwt.withTokenValue("teste").header("alg", "none").subject(email)
