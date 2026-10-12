@@ -124,6 +124,14 @@ As cobranças nascem no Inter (recorrência criada lá). Este serviço só **con
   importação do Inter ignora (com `WARN`) cobrança de unidade isenta; para desconto parcial o valor
   vem do banco, que prevalece. Cobrança já criada não é alterada ao marcar a isenção — para
   removê-la: `infra/apagar-cobranca-unidade-isenta.sh`.
+- **Boleto em PDF** (`GET /cobrancaOrdinaria/{id}/pdf`, `BoletoImpl`): busca no Inter **a cada clique**
+  e não guarda nada. O Inter devolve JSON `{"pdf": base64}`; aqui sai decodificado, `application/pdf`
+  inline, `no-store`. Só para cobrança vinda do banco e em aberto (409 nas demais). Quem abre
+  (`AcessoAoBoleto`): administrador e síndico (tipo de perfil ou papel) qualquer unidade do alcance;
+  os demais só a **própria unidade**, achada pelo e-mail do token (`sub`) no cadastro de moradores.
+  A lista traz `podeVerBoleto` já calculado, e o frontend só mostra o ícone quando é `true`.
+  Falha do Inter vira 502 com mensagem fixa (a causa fica só no log). O proxy `/api/backend` do
+  frontend lê o corpo como texto, por isso o PDF passa por rota própria (`/api/cobrancas/{id}/pdf`).
 - **Smoke test real** (opt-in): `INTER_SMOKE_DIR=<pasta> ./mvnw test -Dtest=InterCobrancaClientSmokeTest`.
 
 ## Segurança
