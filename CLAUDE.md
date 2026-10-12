@@ -156,6 +156,11 @@ As cobranças nascem no Inter (recorrência criada lá). Este serviço só **con
   são semiabertos (`fim` exclusivo). A resposta já traz `ehMeu`/`podeEditar`/`podeCancelar`/`podeDecidir`.
   Catálogo de áreas é do síndico (`AREA_ESCREVER`); o morador só escolhe. Permissões na V7 do
   oauth-service.
+- **Saldo da conta** (`GET /saldoBancario`, `SaldoImpl`): consulta `GET /banking/v2/saldo` do Inter
+  (escopo `extrato.read`, já no token). Permissão `SALDO_LER`, concedida só ao papel SINDICO (V8 do
+  oauth-service). Cache de 1 minuto por condomínio no servidor, `Cache-Control: no-store` na resposta,
+  409 se o condomínio não tem conta Inter, 502 com mensagem fixa se o banco falhar. Validado contra o
+  Inter real: os cinco campos (`disponivel`, três bloqueios, `limite`) chegam.
 - **Smoke test real** (opt-in): `INTER_SMOKE_DIR=<pasta> ./mvnw test -Dtest=InterCobrancaClientSmokeTest`.
 
 ## Segurança

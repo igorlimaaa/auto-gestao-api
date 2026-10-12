@@ -113,6 +113,21 @@ public class InterCobrancaClient {
 		}
 	}
 
+	/**
+	 * {@code GET /banking/v2/saldo} — saldo da conta-corrente (escopo {@code extrato.read}, já pedido
+	 * no token). Sem data, o banco responde o saldo de agora. Somente leitura.
+	 */
+	public InterSaldo consultarSaldo(Long idCondominio) {
+		InterSaldo saldo = executar(idCondominio, cliente -> cliente.get()
+				.uri("/banking/v2/saldo")
+				.retrieve()
+				.body(InterSaldo.class));
+		if (saldo == null || saldo.disponivel() == null) {
+			throw new InterApiException("O Banco Inter não devolveu o saldo da conta.");
+		}
+		return saldo;
+	}
+
 	private <T> T executar(Long idCondominio, java.util.function.Function<RestClient, T> chamada) {
 		try {
 			return chamarComToken(idCondominio, chamada);

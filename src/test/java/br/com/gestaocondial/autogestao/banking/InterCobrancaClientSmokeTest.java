@@ -48,4 +48,23 @@ class InterCobrancaClientSmokeTest {
 		assertTrue(pdf.length > 1000 && new String(pdf, 0, 5).equals("%PDF-"));
 	}
 
+	/**
+	 * Confere que o saldo chega e tem a forma esperada. Imprime só a presença dos campos — nunca os
+	 * valores, que são dinheiro do condomínio.
+	 */
+	@Test
+	void consultaOSaldoReal() {
+		Long idCondominio = Long.valueOf(System.getenv().getOrDefault("INTER_SMOKE_ID_CONDOMINIO", "1"));
+		InterProperties props = new InterProperties("https://cdpj.partners.bancointer.com.br",
+				System.getenv("INTER_SMOKE_DIR"), "boleto-cobranca.read extrato.read rec.read");
+		InterCobrancaClient cliente = new InterCobrancaClient(props, new CredenciaisInterProvider(props));
+
+		InterSaldo saldo = cliente.consultarSaldo(idCondominio);
+		System.out.println("SMOKE saldo: disponivel=" + (saldo.disponivel() != null) + " bloqueadoCheque="
+				+ (saldo.bloqueadoCheque() != null) + " bloqueadoJudicialmente=" + (saldo.bloqueadoJudicialmente() != null)
+				+ " bloqueadoAdministrativo=" + (saldo.bloqueadoAdministrativo() != null) + " limite="
+				+ (saldo.limite() != null));
+		assertNotNull(saldo.disponivel());
+	}
+
 }

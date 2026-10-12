@@ -39,6 +39,10 @@ tags:
       os demais quando o síndico/administrador (permissão `EVENTO_APROVAR`) o aprova; os cadastrados
       pelos outros perfis já nascem `APROVADO`. Reserva de área e manutenção de área não podem
       se sobrepor a outro evento aprovado da mesma área.
+  - name: SaldoBancario
+    description: >
+      Saldo da conta-corrente do condomínio no Banco Inter (somente leitura). Dado financeiro
+      sensível: exige a permissão `SALDO_LER`, concedida só ao síndico.
 paths:
   /condominio:
     get:
@@ -1179,6 +1183,43 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ListaDeErros"
+  /saldoBancario:
+    get:
+      tags: [SaldoBancario]
+      operationId: findSaldoBancario
+      summary: Consulta o saldo da conta-corrente do condomínio.
+      description: >
+        Exige a permissão `SALDO_LER`. Consulta o Banco Inter (`GET /banking/v2/saldo`); a resposta
+        fica em cache por um minuto e nunca é guardada pelo navegador (`Cache-Control: no-store`).
+        409 se o condomínio não tem conta do Inter configurada; 502 se o banco falhar.
+      parameters:
+        - name: idCondominio
+          in: query
+          description: Omitido, vale o condomínio do perfil ativo.
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Saldo da conta.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SaldoBancario"
+        "400":
+          $ref: "#/components/responses/DadosInvalidos"
+        "409":
+          description: O condomínio não tem a conta do Banco Inter configurada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListaDeErros"
+        "502":
+          description: Não foi possível consultar o banco.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListaDeErros"
 components:
   responses:
     DadosInvalidos:
@@ -1200,6 +1241,29 @@ components:
           schema:
             $ref: "#/components/schemas/ListaDeErros"
   schemas:
+    SaldoBancario:
+      type: object
+      required: [idCondominio, disponivel, bloqueado, consultadoEm]
+      properties:
+        idCondominio:
+          type: integer
+          format: int64
+        disponivel:
+          type: number
+          format: double
+          description: Quanto pode ser movimentado agora.
+        bloqueado:
+          type: number
+          format: double
+          description: Soma dos bloqueios (cheque, judicial e administrativo).
+        limite:
+          type: number
+          format: double
+          description: Limite da conta.
+        consultadoEm:
+          type: string
+          format: date-time
+          description: Quando o banco foi consultado — o saldo vale para esse instante.
     AreaComum:
       type: object
       description: >

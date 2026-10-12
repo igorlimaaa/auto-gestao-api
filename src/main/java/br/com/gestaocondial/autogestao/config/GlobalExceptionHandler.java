@@ -18,6 +18,7 @@ import br.com.gestaocondial.autogestao.exception.AcessoNegadoException;
 import br.com.gestaocondial.autogestao.exception.AreaComumJaExisteException;
 import br.com.gestaocondial.autogestao.exception.AreaComumNaoEncontradaException;
 import br.com.gestaocondial.autogestao.exception.ConflitoDeAgendaException;
+import br.com.gestaocondial.autogestao.exception.ContaBancariaNaoConfiguradaException;
 import br.com.gestaocondial.autogestao.exception.EventoNaoEncontradoException;
 import br.com.gestaocondial.autogestao.exception.SituacaoDoEventoInvalidaException;
 import br.com.gestaocondial.autogestao.exception.CobrancaOrdinariaNaoEncontradaException;
@@ -86,7 +87,8 @@ public class GlobalExceptionHandler {
 	}
 
 	/** Área ocupada no horário, ou operação que não cabe na situação atual do evento. */
-	@ExceptionHandler({ ConflitoDeAgendaException.class, SituacaoDoEventoInvalidaException.class })
+	@ExceptionHandler({ ConflitoDeAgendaException.class, SituacaoDoEventoInvalidaException.class,
+			ContaBancariaNaoConfiguradaException.class })
 	public ResponseEntity<ListaDeErrosOutputDto> handleConflitoDeAgenda(RuntimeException ex) {
 		return resposta(null, ex.getMessage(), HttpStatus.CONFLICT);
 	}
