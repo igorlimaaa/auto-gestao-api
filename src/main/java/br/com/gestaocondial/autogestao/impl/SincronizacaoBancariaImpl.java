@@ -2,6 +2,7 @@ package br.com.gestaocondial.autogestao.impl;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -15,10 +16,13 @@ import br.com.gestaocondial.autogestao.banking.InterApiException;
 import br.com.gestaocondial.autogestao.banking.InterCobranca;
 import br.com.gestaocondial.autogestao.banking.InterCobrancaClient;
 import br.com.gestaocondial.autogestao.banking.SituacoesDoBanco;
+import br.com.gestaocondial.autogestao.domain.CobrancaBancoPendente;
 import br.com.gestaocondial.autogestao.domain.CobrancaOrdinaria;
 import br.com.gestaocondial.autogestao.domain.Condominio;
 import br.com.gestaocondial.autogestao.domain.Unidade;
+import br.com.gestaocondial.autogestao.enumeration.MotivoDePendenciaEnum;
 import br.com.gestaocondial.autogestao.exception.CondominioNaoEncontradoException;
+import br.com.gestaocondial.autogestao.repository.CobrancaBancoPendenteRepository;
 import br.com.gestaocondial.autogestao.repository.CobrancaOrdinariaRepository;
 import br.com.gestaocondial.autogestao.repository.CondominioRepository;
 import br.com.gestaocondial.autogestao.repository.UnidadeRepository;
@@ -51,6 +55,8 @@ public class SincronizacaoBancariaImpl implements SincronizacaoBancariaService {
 	private final InterCobrancaClient banco;
 
 	private final CobrancaOrdinariaRepository cobrancaRepository;
+
+	private final CobrancaBancoPendenteRepository pendenciaRepository;
 
 	private final CondominioRepository condominioRepository;
 
@@ -119,49 +125,78 @@ public class SincronizacaoBancariaImpl implements SincronizacaoBancariaService {
 		try {
 			doBanco = banco.listar(condominio.getId(), de, ate);
 		} catch (InterApiException e) {
+			// Sem a listagem não dá para saber o que está pendente: mantém o retrato anterior.
 			log.error("Importação do condomínio {} falhou: {}", condominio.getId(), e.getMessage());
 			return;
 		}
 		int gravadas = 0;
+		List<CobrancaBancoPendente> pendencias = new ArrayList<>();
 		for (InterCobranca item : doBanco) {
 			try {
-				Boolean gravou = transacao.execute(status -> gravar(condominio, item));
-				if (Boolean.TRUE.equals(gravou)) {
+				Resultado resultado = transacao.execute(status -> gravar(condominio, item));
+				if (resultado == null) {
+					continue;
+				}
+				if (resultado.gravada()) {
 					gravadas++;
+				} else if (resultado.motivo() != null) {
+					pendencias.add(pendencia(condominio, item, resultado.motivo()));
 				}
 			} catch (RuntimeException e) {
 				log.warn("Cobrança {} do condomínio {} não importada: {}", codigoDe(item), condominio.getId(),
 						e.getMessage());
 			}
 		}
-		log.info("Condomínio {}: {} cobrança(s) no banco, {} gravada(s).", condominio.getId(), doBanco.size(),
-				gravadas);
+		registrarPendencias(condominio.getId(), pendencias);
+		log.info("Condomínio {}: {} cobrança(s) no banco, {} gravada(s), {} pendente(s) de vínculo.",
+				condominio.getId(), doBanco.size(), gravadas, pendencias.size());
 	}
 
-	/** @return {@code true} se gravou; {@code false} se o item não pôde ser casado com uma unidade. */
-	private boolean gravar(Condominio condominio, InterCobranca item) {
+	/** Substitui o retrato de pendências do condomínio pelo da importação que acabou de rodar. */
+	private void registrarPendencias(Long idCondominio, List<CobrancaBancoPendente> pendencias) {
+		transacao.executeWithoutResult(status -> {
+			pendenciaRepository.apagarDoCondominio(idCondominio);
+			pendenciaRepository.saveAll(pendencias);
+		});
+	}
+
+	private static CobrancaBancoPendente pendencia(Condominio condominio, InterCobranca item, MotivoDePendenciaEnum motivo) {
+		InterCobranca.Cobranca dados = item.cobranca();
+		CobrancaBancoPendente pendente = new CobrancaBancoPendente();
+		pendente.setIdCondominio(condominio.getId());
+		pendente.setCodigoSolicitacao(dados.codigoSolicitacao());
+		pendente.setSeuNumero(dados.seuNumero());
+		pendente.setDataVencimento(dados.dataVencimento());
+		pendente.setValor(dados.valorNominal() != null ? dados.valorNominal().doubleValue() : null);
+		pendente.setMotivo(motivo);
+		return pendente;
+	}
+
+	/** Grava a cobrança do banco; se não puder, devolve o motivo (ou nada, para item sem código). */
+	private Resultado gravar(Condominio condominio, InterCobranca item) {
 		InterCobranca.Cobranca dados = item.cobranca();
 		if (dados == null || dados.codigoSolicitacao() == null) {
-			return false;
+			return new Resultado(false, null);
 		}
 		Optional<CobrancaOrdinaria> existente = cobrancaRepository.findByCodigoSolicitacao(dados.codigoSolicitacao());
 		CobrancaOrdinaria cobranca = existente.orElse(null);
 		if (cobranca == null) {
-			cobranca = localizarOuCriar(condominio, item);
-			if (cobranca == null) {
-				return false;
+			Localizacao localizacao = localizarOuCriar(condominio, item);
+			if (localizacao.cobranca() == null) {
+				return new Resultado(false, localizacao.motivo());
 			}
+			cobranca = localizacao.cobranca();
 			vincular(cobranca, item);
 		} else {
 			completarImutaveis(cobranca, item);
 			if (jaResolvida(cobranca)) {
 				// Paga, cancelada ou expirada: nada mais muda no banco. Regravar só moveria o
-				// "conferida em" a cada importação diária, mesmo critério do job horário.
-				return true;
+				// "conferida em" a cada importação, mesmo critério da reconsulta horária.
+				return new Resultado(true, null);
 			}
 		}
 		atualizarMutaveis(cobranca, item);
-		return true;
+		return new Resultado(true, null);
 	}
 
 	/** Mesmo critério de {@code findPendentesDeSincronizacao}: o que sai da reconsulta horária. */
@@ -172,50 +207,57 @@ public class SincronizacaoBancariaImpl implements SincronizacaoBancariaService {
 	/**
 	 * Casa a cobrança do banco com a unidade pelo {@code seuNumero} ("unidade-ano") e com a
 	 * competência pelo mês do vencimento — o ano sozinho não distingue os 12 boletos da mesma
-	 * unidade. Reaproveita o registro que o job de geração já criou para a competência.
+	 * unidade. O banco é a única origem: se não houver registro da competência, ele é criado aqui.
+	 * Um registro local sem vínculo (de antes da integração) é aproveitado em vez de duplicado.
 	 */
-	private CobrancaOrdinaria localizarOuCriar(Condominio condominio, InterCobranca item) {
+	private Localizacao localizarOuCriar(Condominio condominio, InterCobranca item) {
 		InterCobranca.Cobranca dados = item.cobranca();
-		Optional<Unidade> unidade = resolverUnidade(condominio.getId(), dados.seuNumero());
-		if (unidade.isEmpty() || dados.dataVencimento() == null) {
-			log.warn("Cobrança {} (seuNumero={}) não casa com uma unidade única do condomínio {}; ignorada.",
+		List<Unidade> candidatas = unidadesDoSeuNumero(condominio.getId(), dados.seuNumero());
+		if (candidatas.size() > 1) {
+			log.warn("Cobrança {} (seuNumero={}): o número existe em mais de um bloco do condomínio {}.",
 					dados.codigoSolicitacao(), dados.seuNumero(), condominio.getId());
-			return null;
+			return Localizacao.sem(MotivoDePendenciaEnum.UNIDADE_AMBIGUA);
 		}
-		if (unidade.get().isentaDaTaxaOrdinaria()) {
+		if (candidatas.isEmpty() || dados.dataVencimento() == null) {
+			log.warn("Cobrança {} (seuNumero={}): nenhuma unidade correspondente no condomínio {}.",
+					dados.codigoSolicitacao(), dados.seuNumero(), condominio.getId());
+			return Localizacao.sem(MotivoDePendenciaEnum.SEM_UNIDADE);
+		}
+		Unidade unidade = candidatas.get(0);
+		if (unidade.isentaDaTaxaOrdinaria()) {
 			log.warn("Cobrança {} (seuNumero={}) é de uma unidade isenta da taxa (condomínio {}); ignorada. "
 					+ "Cancele-a no banco.", dados.codigoSolicitacao(), dados.seuNumero(), condominio.getId());
-			return null;
+			return Localizacao.sem(MotivoDePendenciaEnum.UNIDADE_ISENTA);
 		}
 		LocalDate competencia = dados.dataVencimento().withDayOfMonth(1);
-		Optional<CobrancaOrdinaria> local = cobrancaRepository.findByUnidadeIdAndCompetencia(unidade.get().getId(),
+		Optional<CobrancaOrdinaria> local = cobrancaRepository.findByUnidadeIdAndCompetencia(unidade.getId(),
 				competencia);
 		if (local.isPresent()) {
 			String jaVinculada = local.get().getCodigoSolicitacao();
 			if (jaVinculada != null && !jaVinculada.equals(dados.codigoSolicitacao())) {
-				log.warn("Unidade {} já tem a cobrança {} na competência {}; {} ignorada.", unidade.get().getId(),
+				log.warn("Unidade {} já tem a cobrança {} na competência {}; {} ignorada.", unidade.getId(),
 						jaVinculada, competencia, dados.codigoSolicitacao());
-				return null;
+				return Localizacao.sem(MotivoDePendenciaEnum.COMPETENCIA_DUPLICADA);
 			}
-			return local.get();
+			return new Localizacao(local.get(), null);
 		}
 		CobrancaOrdinaria nova = new CobrancaOrdinaria();
-		nova.setUnidade(unidade.get());
+		nova.setUnidade(unidade);
 		nova.setCompetencia(competencia);
-		return nova;
+		return new Localizacao(nova, null);
 	}
 
-	private Optional<Unidade> resolverUnidade(Long idCondominio, String seuNumero) {
+	/** Unidades do condomínio com o número do {@code seuNumero}; vazio se o formato não for "número-ano". */
+	private List<Unidade> unidadesDoSeuNumero(Long idCondominio, String seuNumero) {
 		if (seuNumero == null) {
-			return Optional.empty();
+			return List.of();
 		}
 		Matcher m = SEU_NUMERO.matcher(seuNumero.trim());
 		if (!m.matches()) {
-			return Optional.empty();
+			return List.of();
 		}
-		List<Unidade> candidatas = unidadeRepository.findByCondominioIdAndNumero(idCondominio, m.group(1));
-		// Mesmo número em blocos diferentes: o seuNumero não traz o bloco, então não dá para escolher.
-		return candidatas.size() == 1 ? Optional.of(candidatas.get(0)) : Optional.empty();
+		// Mais de uma: mesmo número em blocos diferentes, e o seuNumero não traz o bloco.
+		return unidadeRepository.findByCondominioIdAndNumero(idCondominio, m.group(1));
 	}
 
 	/** Primeira ligação com o banco: tudo que ele informa vale mais que o cadastro local. */
@@ -268,6 +310,14 @@ public class SincronizacaoBancariaImpl implements SincronizacaoBancariaService {
 			return;
 		}
 		cobranca.setSituacaoBanco(dados.situacao());
+		// O banco manda no valor e no vencimento enquanto a cobrança está em aberto: se alguém os
+		// alterar lá, acompanhamos. A competência (chave de unicidade) não muda.
+		if (dados.dataVencimento() != null) {
+			cobranca.setDataVencimento(dados.dataVencimento());
+		}
+		if (dados.valorNominal() != null) {
+			cobranca.setValor(dados.valorNominal().doubleValue());
+		}
 		cobranca.setOrigemRecebimento(dados.origemRecebimento());
 		cobranca.setValorTotalRecebido(
 				dados.valorTotalRecebido() != null ? dados.valorTotalRecebido().doubleValue() : null);
@@ -303,6 +353,18 @@ public class SincronizacaoBancariaImpl implements SincronizacaoBancariaService {
 	}
 
 	private record Pendente(Long id, Long idCondominio, String codigoSolicitacao) {
+	}
+
+	/** Resultado de gravar um item: gravada, ou o motivo de não ter virado cobrança. */
+	private record Resultado(boolean gravada, MotivoDePendenciaEnum motivo) {
+	}
+
+	private record Localizacao(CobrancaOrdinaria cobranca, MotivoDePendenciaEnum motivo) {
+
+		static Localizacao sem(MotivoDePendenciaEnum motivo) {
+			return new Localizacao(null, motivo);
+		}
+
 	}
 
 }

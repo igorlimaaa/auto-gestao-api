@@ -10,10 +10,12 @@ import org.springframework.transaction.annotation.Transactional;
 import br.com.gestaocondial.autogestao.domain.CobrancaOrdinaria;
 import br.com.gestaocondial.autogestao.banking.SituacoesDoBanco;
 import br.com.gestaocondial.autogestao.config.AcessoAoBoleto;
+import br.com.gestaocondial.autogestao.dto.CobrancaBancoPendenteDto;
 import br.com.gestaocondial.autogestao.dto.CobrancaOrdinariaDto;
 import br.com.gestaocondial.autogestao.enumeration.SituacaoCobrancaEnum;
 import br.com.gestaocondial.autogestao.exception.CobrancaOrdinariaNaoEncontradaException;
 import br.com.gestaocondial.autogestao.mapper.CobrancaOrdinariaMapper;
+import br.com.gestaocondial.autogestao.repository.CobrancaBancoPendenteRepository;
 import br.com.gestaocondial.autogestao.repository.CobrancaOrdinariaRepository;
 import br.com.gestaocondial.autogestao.repository.specification.CobrancaOrdinariaSpecifications;
 import br.com.gestaocondial.autogestao.service.CobrancaOrdinariaService;
@@ -30,6 +32,8 @@ public class CobrancaOrdinariaImpl implements CobrancaOrdinariaService {
 
 	private final AcessoAoBoleto acessoAoBoleto;
 
+	private final CobrancaBancoPendenteRepository pendenciaRepository;
+
 	@Override
 	@Transactional(readOnly = true)
 	public List<CobrancaOrdinariaDto> listCobrancas(Long idCondominio, Long idUnidade, LocalDate competencia) {
@@ -40,6 +44,20 @@ public class CobrancaOrdinariaImpl implements CobrancaOrdinariaService {
 
 		AcessoAoBoleto.Alcance alcance = acessoAoBoleto.alcance();
 		return cobrancaRepository.findAll(filtro).stream().map(c -> comSituacao(c, alcance)).toList();
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public List<CobrancaBancoPendenteDto> listPendenciasDoBanco(Long idCondominio) {
+		if (!acessoAoBoleto.alcance().amplo()) {
+			return List.of();
+		}
+		return (idCondominio == null
+				? pendenciaRepository.findAllByOrderByDataVencimentoAsc()
+				: pendenciaRepository.findByIdCondominioOrderByDataVencimentoAsc(idCondominio)).stream()
+				.map(p -> new CobrancaBancoPendenteDto(p.getIdCondominio(), p.getCodigoSolicitacao(), p.getSeuNumero(),
+						p.getDataVencimento(), p.getValor(), p.getMotivo()))
+				.toList();
 	}
 
 	@Override

@@ -112,18 +112,24 @@ As cobranças nascem no Inter (recorrência criada lá). Este serviço só **con
 - **Imutável vs. mutável**: PIX copia-e-cola, linha digitável, código de barras, nosso número,
   txid e `codigoSolicitacao` são gravados uma vez (V9) — a tela nunca consulta o banco para
   exibi-los. Situação, pagamento, valor e origem do recebimento são atualizados pelo job.
-- **Jobs**: importação diária às 03:30 (janela −30/+60 dias por vencimento) e reconsulta horária
-  das cobranças vindas do banco, sem `dt_pagamento` e fora de `RECEBIDO/CANCELADO/EXPIRADO`.
-  Disparo manual: `POST /cobrancaOrdinaria/sincronizar`.
+- **O banco é a única origem das cobranças.** Não existe mais geração local: o job de hora em hora
+  (`SincronizadorDeCobrancasInterJob`) primeiro **importa** (uma listagem por condomínio, janela
+  −30/+60 dias por vencimento: cria o registro e o vínculo com a unidade) e depois **reconsulta** uma
+  a uma as em aberto (cobre as que já saíram da janela). Disparo manual:
+  `POST /cobrancaOrdinaria/sincronizar`. Valor e vencimento acompanham o banco enquanto a cobrança
+  está em aberto. Condomínio sem credenciais do Inter não gera cobrança.
+- **Pendências** (`tb_cobranca_banco_pendente`, V13): cobrança do banco que não virou cobrança no
+  sistema — `SEM_UNIDADE`, `UNIDADE_AMBIGUA`, `UNIDADE_ISENTA`, `COMPETENCIA_DUPLICADA`. É o retrato
+  da última importação (recalculado a cada rodada; importação que falha mantém o anterior). Aparece
+  como aviso na tela de Cobranças, só para administrador e síndico
+  (`GET /cobrancaOrdinaria/pendencias-do-banco`).
 - **Sem transação durante HTTP**: cada gravação é uma transação curta (`TransactionTemplate`); a
   falha de uma cobrança não derruba o lote, e 3 falhas seguidas num condomínio encerram a rodada
   dele.
-- **Desconto por unidade** (`tb_unidade.nr_percentual_desconto_taxa`, V10): 0 = taxa cheia, 50 =
-  metade, **100 = isenta** (ex.: unidade do síndico). É marca explícita na unidade, não derivada de
-  `Pessoa.isSindico`. O job de geração pula unidade isenta e aplica o desconto parcial ao valor; a
-  importação do Inter ignora (com `WARN`) cobrança de unidade isenta; para desconto parcial o valor
-  vem do banco, que prevalece. Cobrança já criada não é alterada ao marcar a isenção — para
-  removê-la: `infra/apagar-cobranca-unidade-isenta.sh`.
+- **Desconto por unidade** (`tb_unidade.nr_percentual_desconto_taxa`, V10): marca explícita na
+  unidade, não derivada de `Pessoa.isSindico`. **100 = isenta** (ex.: unidade do síndico): cobrança
+  que o banco emitir para ela é ignorada (vira pendência `UNIDADE_ISENTA`). Abaixo de 100 é só
+  informativo — o valor cobrado é o que o banco emite.
 - **Boleto em PDF** (`GET /cobrancaOrdinaria/{id}/pdf`, `BoletoImpl`): busca no Inter **a cada clique**
   e não guarda nada. O Inter devolve JSON `{"pdf": base64}`; aqui sai decodificado, `application/pdf`
   inline, `no-store`. Só para cobrança vinda do banco e em aberto (409 nas demais). Quem abre

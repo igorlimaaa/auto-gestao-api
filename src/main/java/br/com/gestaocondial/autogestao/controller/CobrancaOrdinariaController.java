@@ -14,12 +14,12 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RestController;
 
 import br.com.gestaocondial.autogestao.api.CobrancaOrdinariaApi;
+import br.com.gestaocondial.autogestao.api.model.CobrancaBancoPendente;
 import br.com.gestaocondial.autogestao.api.model.CobrancaOrdinaria;
 import br.com.gestaocondial.autogestao.api.model.DadosDePagamentoCobranca;
 import br.com.gestaocondial.autogestao.api.model.RegistroDePagamento;
 import br.com.gestaocondial.autogestao.config.EscopoDoCondominio;
 import br.com.gestaocondial.autogestao.dto.CobrancaOrdinariaDto;
-import br.com.gestaocondial.autogestao.job.GeradorDeCobrancaOrdinariaJob;
 import br.com.gestaocondial.autogestao.mapper.CobrancaOrdinariaApiMapper;
 import br.com.gestaocondial.autogestao.dto.BoletoPdfDto;
 import br.com.gestaocondial.autogestao.service.BoletoService;
@@ -37,8 +37,6 @@ public class CobrancaOrdinariaController implements CobrancaOrdinariaApi {
 	private final CobrancaOrdinariaApiMapper cobrancaApiMapper;
 
 	private final EscopoDoCondominio escopoDoCondominio;
-
-	private final GeradorDeCobrancaOrdinariaJob geradorDeCobrancaOrdinariaJob;
 
 	private final SincronizacaoBancariaService sincronizacaoBancaria;
 
@@ -83,18 +81,6 @@ public class CobrancaOrdinariaController implements CobrancaOrdinariaApi {
 	}
 
 	@Override
-	@PreAuthorize("hasAuthority('COBRANCA_ESCREVER')")
-	public ResponseEntity<Void> gerarCobrancasOrdinarias(Long idCondominio) {
-		Long escopo = escopoDoCondominio.restringir(idCondominio);
-		if (escopo == null) {
-			geradorDeCobrancaOrdinariaJob.gerar();
-		} else {
-			geradorDeCobrancaOrdinariaJob.gerarParaCondominio(escopo);
-		}
-		return ResponseEntity.noContent().build();
-	}
-
-	@Override
 	// Só o papel ADMINISTRADOR: cada disparo consome chamadas da conta do condomínio no banco.
 	@PreAuthorize("hasRole('ADMINISTRADOR') and hasAuthority('COBRANCA_ESCREVER')")
 	public ResponseEntity<Void> sincronizarCobrancasOrdinarias(Long idCondominio) {
@@ -115,6 +101,22 @@ public class CobrancaOrdinariaController implements CobrancaOrdinariaApi {
 				// Dado pessoal e sempre fresco: nada de cache no navegador nem em intermediários.
 				.cacheControl(CacheControl.noStore())
 				.body(new ByteArrayResource(boleto.getConteudo()));
+	}
+
+	@Override
+	@PreAuthorize("hasAuthority('COBRANCA_LER')")
+	public ResponseEntity<List<CobrancaBancoPendente>> listPendenciasDoBanco(Long idCondominio) {
+		Long escopo = escopoDoCondominio.restringir(idCondominio);
+		return ResponseEntity.ok(cobrancaService.listPendenciasDoBanco(escopo).stream().map(p -> {
+			CobrancaBancoPendente api = new CobrancaBancoPendente();
+			api.setIdCondominio(p.getIdCondominio());
+			api.setCodigoSolicitacao(p.getCodigoSolicitacao());
+			api.setSeuNumero(p.getSeuNumero());
+			api.setDataVencimento(p.getDataVencimento());
+			api.setValor(p.getValor());
+			api.setMotivo(CobrancaBancoPendente.MotivoEnum.fromValue(p.getMotivo().name()));
+			return api;
+		}).toList());
 	}
 
 }

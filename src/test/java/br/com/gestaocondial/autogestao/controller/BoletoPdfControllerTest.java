@@ -31,11 +31,14 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import br.com.gestaocondial.autogestao.banking.InterApiException;
 import br.com.gestaocondial.autogestao.banking.InterCobrancaClient;
+import br.com.gestaocondial.autogestao.domain.CobrancaBancoPendente;
 import br.com.gestaocondial.autogestao.domain.CobrancaOrdinaria;
+import br.com.gestaocondial.autogestao.enumeration.MotivoDePendenciaEnum;
 import br.com.gestaocondial.autogestao.domain.Condominio;
 import br.com.gestaocondial.autogestao.domain.Endereco;
 import br.com.gestaocondial.autogestao.domain.Pessoa;
 import br.com.gestaocondial.autogestao.domain.Unidade;
+import br.com.gestaocondial.autogestao.repository.CobrancaBancoPendenteRepository;
 import br.com.gestaocondial.autogestao.repository.CobrancaOrdinariaRepository;
 import br.com.gestaocondial.autogestao.repository.CondominioRepository;
 import br.com.gestaocondial.autogestao.repository.EnderecoRepository;
@@ -59,6 +62,9 @@ class BoletoPdfControllerTest {
 
 	@Autowired
 	private CobrancaOrdinariaRepository cobrancaRepository;
+
+	@Autowired
+	private CobrancaBancoPendenteRepository pendenciaRepository;
 
 	@Autowired
 	private CondominioRepository condominioRepository;
@@ -99,6 +105,7 @@ class BoletoPdfControllerTest {
 	@AfterEach
 	void limparDados() {
 		SecurityContextHolder.clearContext();
+		pendenciaRepository.deleteAll();
 		cobrancaRepository.deleteAll();
 		pessoaRepository.deleteAll();
 		unidadeRepository.deleteAll();
@@ -222,6 +229,31 @@ class BoletoPdfControllerTest {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$[?(@.id == " + aberta101.getId() + ")].podeVerBoleto").value(true))
 				.andExpect(jsonPath("$[?(@.id == " + aberta102.getId() + ")].podeVerBoleto").value(false));
+	}
+
+	// ------------------------------------------------------------------ pendências do banco
+
+	@Test
+	void sindicoVeAsPendenciasDoBancoEMoradorNao() throws Exception {
+		CobrancaBancoPendente pendente = new CobrancaBancoPendente();
+		pendente.setIdCondominio(condominio.getId());
+		pendente.setCodigoSolicitacao("cod-sem-unidade");
+		pendente.setSeuNumero("1405-26");
+		pendente.setDataVencimento(LocalDate.of(2026, 10, 10));
+		pendente.setValor(850.0);
+		pendente.setMotivo(MotivoDePendenciaEnum.SEM_UNIDADE);
+		pendenciaRepository.save(pendente);
+
+		mockMvc.perform(get("/cobrancaOrdinaria/pendencias-do-banco").with(sindico(condominio.getId())))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.length()").value(1))
+				.andExpect(jsonPath("$[0].seuNumero").value("1405-26"))
+				.andExpect(jsonPath("$[0].motivo").value("SEM_UNIDADE"));
+
+		mockMvc.perform(get("/cobrancaOrdinaria/pendencias-do-banco")
+				.with(morador("morador101@teste.com", condominio.getId())))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.length()").value(0));
 	}
 
 	// ------------------------------------------------------------------ apoio

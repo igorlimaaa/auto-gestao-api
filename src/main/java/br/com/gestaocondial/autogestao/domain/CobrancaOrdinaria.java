@@ -21,8 +21,9 @@ import lombok.Setter;
 
 /**
  * Cobrança mensal da taxa ordinária de uma {@link Unidade} — nunca de uma {@link Pessoa}, para
- * que a troca de morador não afete o histórico de pagamento. Nasce pelo job agendado
- * ({@code GeradorDeCobrancaOrdinariaJob}); não há criação nem exclusão manual.
+ * que a troca de morador não afete o histórico de pagamento. Nasce da importação
+ * do Banco Inter ({@code SincronizacaoBancariaImpl}) — o banco é a única origem das cobranças; não há
+ * criação nem exclusão manual.
  */
 @Entity
 @Getter

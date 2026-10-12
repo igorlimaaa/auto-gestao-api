@@ -24,10 +24,9 @@ tags:
   - name: CobrancaOrdinaria
     description: >
       Controle mensal de cobrança da taxa ordinária, por unidade — nunca por morador, para que
-      a troca de morador não afete o histórico de pagamento. Os registros nascem por um job
-      agendado, a partir do dia de vencimento cadastrado no condomínio, ou por disparo manual
-      desse mesmo job (`POST /cobrancaOrdinaria/gerar`) — não há criação avulsa nem exclusão
-      manual.
+      a troca de morador não afete o histórico de pagamento. O Banco Inter é a única origem: os
+      registros nascem da importação das cobranças que ele emite (job de hora em hora, ou
+      `POST /cobrancaOrdinaria/sincronizar`) — não há criação avulsa nem exclusão manual.
 paths:
   /condominio:
     get:
@@ -713,35 +712,33 @@ paths:
           $ref: "#/components/responses/DadosInvalidos"
         "404":
           $ref: "#/components/responses/NaoEncontrado"
-  /cobrancaOrdinaria/gerar:
-    post:
+  /cobrancaOrdinaria/pendencias-do-banco:
+    get:
       tags: [CobrancaOrdinaria]
-      operationId: gerarCobrancasOrdinarias
-      summary: Dispara manualmente a geração das cobranças pendentes.
+      operationId: listPendenciasDoBanco
+      summary: Cobranças do banco que não viraram cobrança no sistema.
       description: >
-        Exige a permissão `COBRANCA_ESCREVER`. Roda exatamente a mesma lógica do job agendado,
-        usando a data de hoje — não simula outras datas. Existe para testar o fluxo sem esperar
-        o calendário, e como rede de segurança manual caso o job agendado não rode em algum dia.
-        Idempotente: nunca duplica uma cobrança já gerada para a mesma unidade e competência.
+        Exige a permissão `COBRANCA_LER`. O banco é a única origem das cobranças; quando a
+        importação não consegue ligar uma cobrança dele a uma unidade (ou a regra não deixa
+        criá-la), ela aparece aqui em vez de sumir em silêncio. É o retrato da última importação.
 
-        Sem `idCondominio`, um perfil com escopo (síndico, subsíndico, etc.) roda só para o
-        próprio condomínio; um perfil global (sem claim de condomínio) roda para todos. Pedir
-        explicitamente um condomínio fora do próprio escopo responde 403.
+        Só administrador e síndico as veem; os demais perfis recebem lista vazia.
       parameters:
         - name: idCondominio
           in: query
-          description: Restringe a geração a um único condomínio.
+          description: Restringe a um condomínio.
           schema:
             type: integer
             format: int64
       responses:
-        "204":
-          description: >
-            Geração concluída — nenhuma cobrança nova é criada se não havia nada pendente.
-        "400":
-          $ref: "#/components/responses/DadosInvalidos"
-        "404":
-          $ref: "#/components/responses/NaoEncontrado"
+        "200":
+          description: Pendências encontradas (lista vazia quando não há nenhuma).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CobrancaBancoPendente"
   /cobrancaOrdinaria/sincronizar:
     post:
       tags: [CobrancaOrdinaria]
@@ -911,8 +908,9 @@ components:
           minimum: 0
           maximum: 100
           description: >
-            Desconto sobre a taxa ordinária, de 0 a 100. `100` isenta a unidade (nenhuma cobrança é
-            gerada para ela); `50` cobra metade. Ausente mantém o valor atual.
+            Desconto sobre a taxa ordinária, de 0 a 100. `100` isenta a unidade: cobrança que o banco
+            emitir para ela é ignorada (e listada em `pendencias-do-banco`). Abaixo de 100 é só
+            informativo — o valor cobrado é o que o banco emite. Ausente mantém o valor atual.
         motivoDescontoTaxa:
           type: string
           maxLength: 100
@@ -1064,8 +1062,8 @@ components:
     CobrancaOrdinaria:
       type: object
       description: >
-        Registro mensal de cobrança da taxa ordinária de uma unidade. Nasce pelo job agendado
-        (ver a descrição da tag `CobrancaOrdinaria`) — não há endpoint de criação nem exclusão.
+        Registro mensal de cobrança da taxa ordinária de uma unidade. Nasce da importação do Banco
+        Inter (ver a descrição da tag `CobrancaOrdinaria`) — não há endpoint de criação nem exclusão.
       properties:
         id:
           type: integer
@@ -1132,6 +1130,30 @@ components:
             Calculada no servidor: PAGO quando há `dataPagamento`; CANCELADA quando o banco
             informa cancelada ou expirada; INADIMPLENTE quando o vencimento passou sem
             pagamento; PENDENTE nos demais casos.
+    CobrancaBancoPendente:
+      type: object
+      description: Cobrança emitida no banco que não virou cobrança no sistema.
+      properties:
+        idCondominio:
+          type: integer
+          format: int64
+        codigoSolicitacao:
+          type: string
+        seuNumero:
+          type: string
+        dataVencimento:
+          type: string
+          format: date
+        valor:
+          type: number
+          format: double
+        motivo:
+          type: string
+          enum: [SEM_UNIDADE, UNIDADE_AMBIGUA, UNIDADE_ISENTA, COMPETENCIA_DUPLICADA]
+          description: >
+            `SEM_UNIDADE`: nenhuma unidade com o número do `seuNumero`. `UNIDADE_AMBIGUA`: o número
+            existe em mais de um bloco. `UNIDADE_ISENTA`: a unidade está isenta (100%) mas o banco
+            emitiu cobrança. `COMPETENCIA_DUPLICADA`: a unidade já tem outra cobrança nesse mês.
     DadosDePagamentoCobranca:
       type: object
       properties:

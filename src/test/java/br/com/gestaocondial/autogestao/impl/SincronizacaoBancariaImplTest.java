@@ -24,12 +24,16 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+import br.com.gestaocondial.autogestao.banking.InterApiException;
 import br.com.gestaocondial.autogestao.banking.InterCobranca;
 import br.com.gestaocondial.autogestao.banking.InterCobrancaClient;
 import br.com.gestaocondial.autogestao.domain.CobrancaOrdinaria;
+import br.com.gestaocondial.autogestao.domain.CobrancaBancoPendente;
 import br.com.gestaocondial.autogestao.domain.Condominio;
 import br.com.gestaocondial.autogestao.domain.Endereco;
 import br.com.gestaocondial.autogestao.domain.Unidade;
+import br.com.gestaocondial.autogestao.enumeration.MotivoDePendenciaEnum;
+import br.com.gestaocondial.autogestao.repository.CobrancaBancoPendenteRepository;
 import br.com.gestaocondial.autogestao.repository.CobrancaOrdinariaRepository;
 import br.com.gestaocondial.autogestao.repository.CondominioRepository;
 import br.com.gestaocondial.autogestao.repository.EnderecoRepository;
@@ -55,6 +59,9 @@ class SincronizacaoBancariaImplTest {
 	private CobrancaOrdinariaRepository cobrancaRepository;
 
 	@Autowired
+	private CobrancaBancoPendenteRepository pendenciaRepository;
+
+	@Autowired
 	private CondominioRepository condominioRepository;
 
 	@Autowired
@@ -70,6 +77,7 @@ class SincronizacaoBancariaImplTest {
 
 	@BeforeEach
 	void prepararCenario() throws Exception {
+		pendenciaRepository.deleteAll();
 		cobrancaRepository.deleteAll();
 		unidadeRepository.deleteAll();
 		condominioRepository.deleteAll();
@@ -89,6 +97,7 @@ class SincronizacaoBancariaImplTest {
 	/** O H2 é compartilhado entre as classes de teste: sem limpar, o que criamos vaza (ex.: endereço id 10). */
 	@AfterEach
 	void limparDados() {
+		pendenciaRepository.deleteAll();
 		cobrancaRepository.deleteAll();
 		unidadeRepository.deleteAll();
 		condominioRepository.deleteAll();
@@ -162,6 +171,116 @@ class SincronizacaoBancariaImplTest {
 				"cobrança paga não deve ter o 'conferida em' movido pela importação");
 		assertTrue(cobrancaRepository.findById(aberta.getId()).orElseThrow().getDataUltimaSincronizacao().isAfter(antiga),
 				"cobrança em aberto continua sendo atualizada");
+	}
+
+	// ------------------------------------------------------------------ o banco é a única origem
+
+	@Test
+	void importacaoCriaARegistroEOVinculoSemNenhumRegistroLocalPrevio() {
+		assertEquals(0, cobrancaRepository.count());
+
+		sincronizacao.importar(condominio.getId());
+
+		assertEquals(2, cobrancaRepository.count());
+		assertTrue(pendenciaRepository.findAll().isEmpty());
+	}
+
+	@Test
+	void acompanhaMudancaDeValorEVencimentoFeitaNoBancoEnquantoEmAberto() throws Exception {
+		sincronizacao.importar(condominio.getId());
+		InterCobranca original = ler("/inter/listagem.json", InterCobranca.Pagina.class).cobrancas().get(0);
+		InterCobranca.Cobranca c = original.cobranca();
+		InterCobranca alterada = new InterCobranca(new InterCobranca.Cobranca(c.codigoSolicitacao(), c.seuNumero(),
+				c.situacao(), c.dataSituacao(), c.dataEmissao(), LocalDate.of(2026, 10, 15),
+				new java.math.BigDecimal("900.00"), c.valorTotalRecebido(), c.origemRecebimento()),
+				original.boleto(), original.pix());
+		when(banco.listar(eq(condominio.getId()), any(), any())).thenReturn(List.of(alterada));
+
+		sincronizacao.importar(condominio.getId());
+
+		CobrancaOrdinaria aberta = cobrancaRepository.findByCodigoSolicitacao(c.codigoSolicitacao()).orElseThrow();
+		assertEquals(900.0, aberta.getValor());
+		assertEquals(LocalDate.of(2026, 10, 15), aberta.getDataVencimento());
+		assertEquals(LocalDate.of(2026, 10, 1), aberta.getCompetencia(), "a competência não muda");
+	}
+
+	@Test
+	void cobrancaSemUnidadeViraPendenciaEntraNaListaEOutrasSeguem() {
+		unidadeRepository.findByCondominioIdAndNumero(condominio.getId(), "1203").forEach(unidadeRepository::delete);
+
+		sincronizacao.importar(condominio.getId());
+
+		List<CobrancaBancoPendente> pendencias = pendenciaRepository.findAll();
+		assertEquals(1, pendencias.size());
+		assertEquals(MotivoDePendenciaEnum.SEM_UNIDADE, pendencias.get(0).getMotivo());
+		assertEquals("1203-26", pendencias.get(0).getSeuNumero());
+		assertEquals(condominio.getId(), pendencias.get(0).getIdCondominio());
+		assertEquals(1, cobrancaRepository.count(), "a da unidade 1404 foi importada normalmente");
+	}
+
+	@Test
+	void mesmoNumeroEmDoisBlocosViraPendenciaDeUnidadeAmbigua() {
+		Unidade outroBloco = new Unidade();
+		outroBloco.setCondominio(condominio);
+		outroBloco.setBloco("B");
+		outroBloco.setNumero("1203");
+		unidadeRepository.save(outroBloco);
+
+		sincronizacao.importar(condominio.getId());
+
+		assertEquals(MotivoDePendenciaEnum.UNIDADE_AMBIGUA, pendenciaRepository.findAll().get(0).getMotivo());
+	}
+
+	@Test
+	void unidadeIsentaComCobrancaNoBancoViraPendencia() {
+		Unidade isenta = unidadeRepository.findByCondominioIdAndNumero(condominio.getId(), "1203").get(0);
+		isenta.setPercentualDescontoTaxa(new java.math.BigDecimal("100"));
+		unidadeRepository.save(isenta);
+
+		sincronizacao.importar(condominio.getId());
+
+		assertEquals(MotivoDePendenciaEnum.UNIDADE_ISENTA, pendenciaRepository.findAll().get(0).getMotivo());
+	}
+
+	@Test
+	void segundaCobrancaNaMesmaCompetenciaViraPendenciaDeDuplicidade() {
+		Unidade unidade = unidadeRepository.findByCondominioIdAndNumero(condominio.getId(), "1203").get(0);
+		CobrancaOrdinaria existente = new CobrancaOrdinaria();
+		existente.setUnidade(unidade);
+		existente.setCompetencia(LocalDate.of(2026, 10, 1));
+		existente.setDataVencimento(LocalDate.of(2026, 10, 10));
+		existente.setCodigoSolicitacao("outra-cobranca-do-banco");
+		cobrancaRepository.save(existente);
+
+		sincronizacao.importar(condominio.getId());
+
+		assertEquals(MotivoDePendenciaEnum.COMPETENCIA_DUPLICADA, pendenciaRepository.findAll().get(0).getMotivo());
+	}
+
+	@Test
+	void pendenciaSomeQuandoAUnidadeEhCadastradaEAImportacaoRoda() {
+		Unidade sumida = unidadeRepository.findByCondominioIdAndNumero(condominio.getId(), "1203").get(0);
+		unidadeRepository.delete(sumida);
+		sincronizacao.importar(condominio.getId());
+		assertEquals(1, pendenciaRepository.count());
+
+		unidade("1203");
+		sincronizacao.importar(condominio.getId());
+
+		assertEquals(0, pendenciaRepository.count(), "o retrato é recalculado a cada importação");
+		assertEquals(2, cobrancaRepository.count());
+	}
+
+	@Test
+	void importacaoQueFalhaNaoApagaOUltimoRetratoDePendencias() {
+		unidadeRepository.findByCondominioIdAndNumero(condominio.getId(), "1203").forEach(unidadeRepository::delete);
+		sincronizacao.importar(condominio.getId());
+		assertEquals(1, pendenciaRepository.count());
+
+		when(banco.listar(eq(condominio.getId()), any(), any())).thenThrow(new InterApiException("fora do ar"));
+		sincronizacao.importar(condominio.getId());
+
+		assertEquals(1, pendenciaRepository.count());
 	}
 
 	@Test
