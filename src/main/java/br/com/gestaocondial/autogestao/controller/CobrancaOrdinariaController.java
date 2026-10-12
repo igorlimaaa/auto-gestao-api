@@ -3,6 +3,12 @@ package br.com.gestaocondial.autogestao.controller;
 import java.time.LocalDate;
 import java.util.List;
 
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RestController;
@@ -15,6 +21,8 @@ import br.com.gestaocondial.autogestao.config.EscopoDoCondominio;
 import br.com.gestaocondial.autogestao.dto.CobrancaOrdinariaDto;
 import br.com.gestaocondial.autogestao.job.GeradorDeCobrancaOrdinariaJob;
 import br.com.gestaocondial.autogestao.mapper.CobrancaOrdinariaApiMapper;
+import br.com.gestaocondial.autogestao.dto.BoletoPdfDto;
+import br.com.gestaocondial.autogestao.service.BoletoService;
 import br.com.gestaocondial.autogestao.service.CobrancaOrdinariaService;
 import br.com.gestaocondial.autogestao.service.SincronizacaoBancariaService;
 
@@ -33,6 +41,8 @@ public class CobrancaOrdinariaController implements CobrancaOrdinariaApi {
 	private final GeradorDeCobrancaOrdinariaJob geradorDeCobrancaOrdinariaJob;
 
 	private final SincronizacaoBancariaService sincronizacaoBancaria;
+
+	private final BoletoService boletoService;
 
 	@Override
 	@PreAuthorize("hasAuthority('COBRANCA_LER')")
@@ -92,6 +102,19 @@ public class CobrancaOrdinariaController implements CobrancaOrdinariaApi {
 		sincronizacaoBancaria.importar(escopo);
 		sincronizacaoBancaria.sincronizarPendentes(escopo);
 		return ResponseEntity.noContent().build();
+	}
+
+	@Override
+	@PreAuthorize("hasAuthority('COBRANCA_LER')")
+	public ResponseEntity<Resource> obterPdfCobrancaOrdinaria(Long idCobrancaOrdinaria) {
+		BoletoPdfDto boleto = boletoService.obterPdf(idCobrancaOrdinaria);
+		return ResponseEntity.ok()
+				.contentType(MediaType.APPLICATION_PDF)
+				.header(HttpHeaders.CONTENT_DISPOSITION,
+						ContentDisposition.inline().filename(boleto.getNomeDoArquivo()).build().toString())
+				// Dado pessoal e sempre fresco: nada de cache no navegador nem em intermediários.
+				.cacheControl(CacheControl.noStore())
+				.body(new ByteArrayResource(boleto.getConteudo()));
 	}
 
 }

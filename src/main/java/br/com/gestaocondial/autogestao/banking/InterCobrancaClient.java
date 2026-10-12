@@ -93,6 +93,26 @@ public class InterCobrancaClient {
 				.body(InterCobranca.class));
 	}
 
+	/**
+	 * {@code GET /cobranca/v3/cobrancas/{codigoSolicitacao}/pdf} — o banco devolve JSON com o
+	 * arquivo em base64 ({@code {"pdf": "..."}}); aqui já sai decodificado. Chamado a cada clique
+	 * do usuário e nunca guardado: o boleto pode mudar (juros, multa).
+	 */
+	public byte[] baixarPdf(Long idCondominio, String codigoSolicitacao) {
+		RespostaDePdf resposta = executar(idCondominio, cliente -> cliente.get()
+				.uri("/cobranca/v3/cobrancas/{codigo}/pdf", codigoSolicitacao)
+				.retrieve()
+				.body(RespostaDePdf.class));
+		if (resposta == null || resposta.pdf() == null || resposta.pdf().isBlank()) {
+			throw new InterApiException("O Banco Inter não devolveu o PDF da cobrança.");
+		}
+		try {
+			return java.util.Base64.getMimeDecoder().decode(resposta.pdf());
+		} catch (IllegalArgumentException e) {
+			throw new InterApiException("O PDF devolvido pelo Banco Inter está corrompido.", e);
+		}
+	}
+
 	private <T> T executar(Long idCondominio, java.util.function.Function<RestClient, T> chamada) {
 		try {
 			return chamarComToken(idCondominio, chamada);
@@ -173,13 +193,19 @@ public class InterCobrancaClient {
 		String detalhe = e instanceof RestClientResponseException r
 				? "HTTP " + r.getStatusCode().value()
 				: e.getClass().getSimpleName();
-		return new InterApiException("Falha ao consultar o Banco Inter (condomínio " + idCondominio + "): " + detalhe, e);
+		Integer status = e instanceof RestClientResponseException r ? r.getStatusCode().value() : null;
+		return new InterApiException("Falha ao consultar o Banco Inter (condomínio " + idCondominio + "): " + detalhe, e,
+				status);
 	}
 
 	/** Descarta o estado em cache de um condomínio (ex.: após trocar o certificado). */
 	public void esquecer(Long idCondominio) {
 		clientes.remove(idCondominio);
 		tokens.remove(idCondominio);
+	}
+
+	@JsonIgnoreProperties(ignoreUnknown = true)
+	private record RespostaDePdf(String pdf) {
 	}
 
 	private record Token(String valor, Instant validoAte) {

@@ -15,5 +15,10 @@ public interface PessoaRepository extends JpaRepository<Pessoa, Long>, JpaSpecif
 
 	long countByCondominioId(Long condominioId);
 
+	/** Cadastro do morador a partir do e-mail do login — base de "a unidade do usuário". */
+	List<Pessoa> findByEmailIgnoreCase(String email);
+
+	List<Pessoa> findByEmailIgnoreCaseAndCondominioId(String email, Long condominioId);
+
 	long countByUnidadeId(Long unidadeId);
 }

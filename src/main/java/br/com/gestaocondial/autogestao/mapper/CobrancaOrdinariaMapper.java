@@ -13,6 +13,7 @@ public interface CobrancaOrdinariaMapper {
 
 	/** {@code situacao} é calculada pelo service, nunca vem da entidade. */
 	@Mapping(target = "situacao", ignore = true)
+	@Mapping(target = "podeVerBoleto", ignore = true)
 	CobrancaOrdinariaDto cobrancaOrdinariaDomainToDto(CobrancaOrdinaria cobranca);
 
 	CobrancaOrdinaria cobrancaOrdinariaDtoToDomain(CobrancaOrdinariaDto cobrancaDto);

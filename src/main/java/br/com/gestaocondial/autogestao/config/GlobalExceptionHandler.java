@@ -1,5 +1,7 @@
 package br.com.gestaocondial.autogestao.config;
 
+import br.com.gestaocondial.autogestao.banking.InterApiException;
+import br.com.gestaocondial.autogestao.exception.BoletoIndisponivelException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.http.ResponseEntity;
@@ -22,12 +24,15 @@ import br.com.gestaocondial.autogestao.exception.TaxaExtraNaoEncontradaException
 import br.com.gestaocondial.autogestao.exception.UnidadeJaExisteException;
 import br.com.gestaocondial.autogestao.exception.UnidadeNaoEncontradaException;
 
+import lombok.extern.slf4j.Slf4j;
+
 /**
  * Tratamento centralizado de exceções da API. Converte falhas de bean
  * validation (@Valid nos endpoints gerados a partir do contrato OpenAPI) e as
  * exceptions de negócio conhecidas em respostas padronizadas usando
  * {@link ListaDeErrosOutputDto}.
  */
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -89,6 +94,26 @@ public class GlobalExceptionHandler {
 	public ResponseEntity<ListaDeErrosOutputDto> handleAutorizacaoNegada(AuthorizationDeniedException ex) {
 		return resposta(null, "O perfil ativo desta sessao nao tem permissao para esta operacao.",
 				HttpStatus.FORBIDDEN);
+	}
+
+	/** Cobrança sem boleto a mostrar (sem vínculo com o banco, ou já paga/cancelada). */
+	@ExceptionHandler(BoletoIndisponivelException.class)
+	public ResponseEntity<ListaDeErrosOutputDto> handleBoletoIndisponivel(BoletoIndisponivelException ex) {
+		return resposta(null, ex.getMessage(), HttpStatus.CONFLICT);
+	}
+
+	/**
+	 * Falha ao falar com o Banco Inter. 502, e não 500: o erro não é nosso, e a mensagem é fixa de
+	 * propósito — a causa (certificado, rede, token) fica no log, nunca na resposta.
+	 */
+	@ExceptionHandler(InterApiException.class)
+	public ResponseEntity<ListaDeErrosOutputDto> handleInterApi(InterApiException ex) {
+		log.error("Falha no Banco Inter: {}", ex.getMessage(), ex);
+		if (ex.getStatusHttp() != null && ex.getStatusHttp() == 404) {
+			return resposta(null, "Cobrança não encontrada no banco.", HttpStatus.NOT_FOUND);
+		}
+		return resposta(null, "Não foi possível consultar o banco agora. Tente novamente em instantes.",
+				HttpStatus.BAD_GATEWAY);
 	}
 
 	/** Regra de coerencia do proprio payload (ex.: unidade sem condominio). */

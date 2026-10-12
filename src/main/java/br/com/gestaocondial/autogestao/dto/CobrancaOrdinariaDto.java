@@ -31,6 +31,9 @@ public class CobrancaOrdinariaDto {
 	/** Preenchido quando a cobrança veio do banco; nulo para cobranças só locais. */
 	private String codigoSolicitacao;
 
+	/** Calculado pelo service: há boleto a abrir e o perfil da requisição pode vê-lo. */
+	private Boolean podeVerBoleto;
+
 	/** Calculada pelo service a partir de {@code dataPagamento}/{@code dataVencimento}. */
 	private SituacaoCobrancaEnum situacao;
 

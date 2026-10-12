@@ -767,6 +767,53 @@ paths:
           description: Sincronização concluída.
         "404":
           $ref: "#/components/responses/NaoEncontrado"
+  /cobrancaOrdinaria/{idCobrancaOrdinaria}/pdf:
+    get:
+      tags: [CobrancaOrdinaria]
+      operationId: obterPdfCobrancaOrdinaria
+      summary: Boleto da cobrança em PDF.
+      description: >
+        Exige a permissão `COBRANCA_LER`. Busca o PDF no Banco Inter **a cada chamada** — nada é
+        guardado. Só para cobranças vindas do banco e ainda em aberto (nem pagas, nem canceladas).
+
+        O PDF traz nome, CPF e endereço do pagador, então administrador e síndico abrem o de
+        qualquer unidade do alcance deles; os demais perfis, só o da própria unidade (achada pelo
+        e-mail do login no cadastro de moradores). Fora disso, 403.
+      parameters:
+        - name: idCobrancaOrdinaria
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: O boleto, para exibir (inline) ou baixar.
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "403":
+          description: O perfil não alcança esta cobrança ou esta unidade.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListaDeErros"
+        "404":
+          $ref: "#/components/responses/NaoEncontrado"
+        "409":
+          description: A cobrança não tem boleto a mostrar (sem vínculo com o banco, paga ou cancelada).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListaDeErros"
+        "502":
+          description: O Banco Inter não respondeu. Tentar de novo em instantes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListaDeErros"
   /cobrancaOrdinaria/{idCobrancaOrdinaria}/pagamento:
     post:
       tags: [CobrancaOrdinaria]
@@ -1066,6 +1113,12 @@ components:
           type: string
           readOnly: true
           description: Id da cobrança no Banco Inter. Ausente em cobranças que não vieram do banco.
+        podeVerBoleto:
+          type: boolean
+          readOnly: true
+          description: >
+            Verdadeiro quando há boleto a abrir (`GET .../pdf`) e o perfil da requisição pode vê-lo:
+            veio do banco, está em aberto, e é de uma unidade que o perfil alcança.
         dataUltimaSincronizacao:
           type: string
           format: date-time

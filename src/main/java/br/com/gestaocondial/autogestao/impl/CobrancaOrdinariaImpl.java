@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import br.com.gestaocondial.autogestao.domain.CobrancaOrdinaria;
 import br.com.gestaocondial.autogestao.banking.SituacoesDoBanco;
+import br.com.gestaocondial.autogestao.config.AcessoAoBoleto;
 import br.com.gestaocondial.autogestao.dto.CobrancaOrdinariaDto;
 import br.com.gestaocondial.autogestao.enumeration.SituacaoCobrancaEnum;
 import br.com.gestaocondial.autogestao.exception.CobrancaOrdinariaNaoEncontradaException;
@@ -27,6 +28,8 @@ public class CobrancaOrdinariaImpl implements CobrancaOrdinariaService {
 
 	private final CobrancaOrdinariaMapper mapper;
 
+	private final AcessoAoBoleto acessoAoBoleto;
+
 	@Override
 	@Transactional(readOnly = true)
 	public List<CobrancaOrdinariaDto> listCobrancas(Long idCondominio, Long idUnidade, LocalDate competencia) {
@@ -35,13 +38,14 @@ public class CobrancaOrdinariaImpl implements CobrancaOrdinariaService {
 				CobrancaOrdinariaSpecifications.doUnidade(idUnidade),
 				CobrancaOrdinariaSpecifications.daCompetencia(competencia));
 
-		return cobrancaRepository.findAll(filtro).stream().map(this::comSituacao).toList();
+		AcessoAoBoleto.Alcance alcance = acessoAoBoleto.alcance();
+		return cobrancaRepository.findAll(filtro).stream().map(c -> comSituacao(c, alcance)).toList();
 	}
 
 	@Override
 	@Transactional(readOnly = true)
 	public CobrancaOrdinariaDto findCobranca(Long idCobrancaOrdinaria) {
-		return comSituacao(porId(idCobrancaOrdinaria));
+		return comSituacao(porId(idCobrancaOrdinaria), acessoAoBoleto.alcance());
 	}
 
 	@Override
@@ -51,7 +55,7 @@ public class CobrancaOrdinariaImpl implements CobrancaOrdinariaService {
 		CobrancaOrdinaria cobranca = porId(idCobrancaOrdinaria);
 		cobranca.setPixCopiaCola(textoOuNulo(pixCopiaCola));
 		cobranca.setLinhaDigitavel(textoOuNulo(linhaDigitavel));
-		return comSituacao(cobrancaRepository.save(cobranca));
+		return comSituacao(cobrancaRepository.save(cobranca), acessoAoBoleto.alcance());
 	}
 
 	@Override
@@ -59,7 +63,7 @@ public class CobrancaOrdinariaImpl implements CobrancaOrdinariaService {
 	public CobrancaOrdinariaDto registrarPagamento(Long idCobrancaOrdinaria, LocalDate dataPagamento) {
 		CobrancaOrdinaria cobranca = porId(idCobrancaOrdinaria);
 		cobranca.setDataPagamento(dataPagamento != null ? dataPagamento : LocalDate.now());
-		return comSituacao(cobrancaRepository.save(cobranca));
+		return comSituacao(cobrancaRepository.save(cobranca), acessoAoBoleto.alcance());
 	}
 
 	private CobrancaOrdinaria porId(Long idCobrancaOrdinaria) {
@@ -68,13 +72,21 @@ public class CobrancaOrdinariaImpl implements CobrancaOrdinariaService {
 						"Cobrança " + idCobrancaOrdinaria + " não encontrada."));
 	}
 
-	private CobrancaOrdinariaDto comSituacao(CobrancaOrdinaria cobranca) {
+	private CobrancaOrdinariaDto comSituacao(CobrancaOrdinaria cobranca, AcessoAoBoleto.Alcance alcance) {
 		CobrancaOrdinariaDto dto = mapper.cobrancaOrdinariaDomainToDto(cobranca);
-		dto.setSituacao(calcularSituacao(cobranca));
+		SituacaoCobrancaEnum situacao = calcularSituacao(cobranca);
+		dto.setSituacao(situacao);
+		dto.setPodeVerBoleto(boletoDisponivel(cobranca, situacao) && alcance.podeVer(cobranca.getUnidade().getId()));
 		return dto;
 	}
 
-	private static SituacaoCobrancaEnum calcularSituacao(CobrancaOrdinaria cobranca) {
+	/** Há boleto a abrir: veio do banco e ainda está em aberto (nem paga, nem cancelada). */
+	static boolean boletoDisponivel(CobrancaOrdinaria cobranca, SituacaoCobrancaEnum situacao) {
+		return cobranca.getCodigoSolicitacao() != null
+				&& (situacao == SituacaoCobrancaEnum.PENDENTE || situacao == SituacaoCobrancaEnum.INADIMPLENTE);
+	}
+
+	static SituacaoCobrancaEnum calcularSituacao(CobrancaOrdinaria cobranca) {
 		if (cobranca.getDataPagamento() != null) {
 			return SituacaoCobrancaEnum.PAGO;
 		}

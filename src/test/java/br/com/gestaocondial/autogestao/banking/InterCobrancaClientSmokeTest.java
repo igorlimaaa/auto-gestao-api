@@ -2,6 +2,7 @@ package br.com.gestaocondial.autogestao.banking;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -41,6 +42,10 @@ class InterCobrancaClientSmokeTest {
 				+ " temPix=" + (detalhe.pix() != null && detalhe.pix().pixCopiaECola() != null)
 				+ " temLinha=" + (detalhe.boleto() != null && detalhe.boleto().linhaDigitavel() != null));
 		assertNotNull(detalhe.cobranca().codigoSolicitacao());
+
+		byte[] pdf = cliente.baixarPdf(idCondominio, primeira.cobranca().codigoSolicitacao());
+		System.out.println("SMOKE pdf: " + pdf.length + " bytes, inicio=" + new String(pdf, 0, 5));
+		assertTrue(pdf.length > 1000 && new String(pdf, 0, 5).equals("%PDF-"));
 	}
 
 }
