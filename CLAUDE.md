@@ -79,6 +79,13 @@ Condominio 1──N TaxaExtra
 - `Pessoa.endereco` é opcional: exigir endereço completo para cadastrar quem mora no condomínio
   contraria o cadastro independente.
 
+- **Fração ideal é calculada, não digitada** (V11/V12): `Condominio.quantidadeUnidades` →
+  `UnidadeDto.fracaoIdeal = 1 / quantidade` (6 casas, `UnidadeMapper`). Nasce na leitura, então
+  acompanha qualquer mudança da quantidade e vale igual para todas as unidades. Sem a quantidade
+  informada, a fração é nula. A coluna `tb_unidade.vl_fracao_ideal` foi removida na V12 (o seed de
+  dev V5 ainda a preenche, mas roda antes da V12). A soma das frações pode diferir de 1 por
+  arredondamento.
+
 ### Migrations
 
 `db/migration` é o schema; `db/migration-dev` é o seed de desenvolvimento. O seed mora **fora**
