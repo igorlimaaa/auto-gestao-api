@@ -43,6 +43,9 @@ public class AlcanceDoPerfil {
 	/** Tipo de perfil do morador. */
 	static final String TIPO_MORADOR = "MORADOR";
 
+	/** Permissão que dá poder de aprovar/recusar eventos da agenda. */
+	static final String AUTORIDADE_DE_APROVACAO = "EVENTO_APROVAR";
+
 	static final Set<String> PAPEIS_AMPLOS = Set.of("ADMINISTRADOR", "SINDICO");
 
 	private final PessoaRepository pessoaRepository;
@@ -53,12 +56,15 @@ public class AlcanceDoPerfil {
 		if (autenticacao == null || !(autenticacao.getPrincipal() instanceof Jwt token)) {
 			// Sem token é chamada interna (job, teste): nenhum endpoint chega aqui sem JWT, porque a
 			// cadeia de segurança barra antes. O boleto continua fechado (amplo = false).
-			return new Alcance(false, false, Set.of(), Set.of());
+			return new Alcance(false, false, Set.of(), Set.of(), null, false);
 		}
 		boolean amplo = ehAmplo(token);
 		boolean apenasProprio = ehMorador(token);
+		String email = token.getSubject();
+		boolean aprova = autenticacao.getAuthorities().stream()
+				.anyMatch(autoridade -> AUTORIDADE_DE_APROVACAO.equals(autoridade.getAuthority()));
 		if (amplo && !apenasProprio) {
-			return new Alcance(true, false, Set.of(), Set.of());
+			return new Alcance(true, false, Set.of(), Set.of(), email, aprova);
 		}
 
 		Collection<Pessoa> cadastros = cadastrosDe(token);
@@ -68,7 +74,7 @@ public class AlcanceDoPerfil {
 				.map(unidade -> unidade.getId())
 				.collect(Collectors.toSet());
 		Set<Long> pessoas = cadastros.stream().map(Pessoa::getId).collect(Collectors.toSet());
-		return new Alcance(amplo, apenasProprio, unidades, pessoas);
+		return new Alcance(amplo, apenasProprio, unidades, pessoas, email, aprova);
 	}
 
 	private static boolean ehAmplo(Jwt token) {
@@ -108,8 +114,11 @@ public class AlcanceDoPerfil {
 	 *            da própria unidade
 	 * @param unidades unidades do próprio usuário (vazio quando {@code amplo} e não morador)
 	 * @param pessoas cadastros de morador do próprio usuário (idem)
+	 * @param email e-mail do login (o {@code sub} do token); nulo em chamada interna
+	 * @param aprova tem a permissão de decidir sobre eventos pendentes
 	 */
-	public record Alcance(boolean amplo, boolean apenasProprio, Set<Long> unidades, Set<Long> pessoas) {
+	public record Alcance(boolean amplo, boolean apenasProprio, Set<Long> unidades, Set<Long> pessoas, String email,
+			boolean aprova) {
 
 		public boolean podeVer(Long idUnidade) {
 			return amplo || (idUnidade != null && unidades.contains(idUnidade));

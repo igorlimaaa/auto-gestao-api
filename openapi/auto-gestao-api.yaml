@@ -27,6 +27,18 @@ tags:
       a troca de morador não afete o histórico de pagamento. O Banco Inter é a única origem: os
       registros nascem da importação das cobranças que ele emite (job de hora em hora, ou
       `POST /cobrancaOrdinaria/sincronizar`) — não há criação avulsa nem exclusão manual.
+  - name: AreaComum
+    description: >
+      Catálogo das áreas comuns do condomínio (salão de festas, churrasqueira, piscina...). É o
+      síndico quem cadastra; o morador só escolhe entre as áreas reserváveis e ativas — nunca digita
+      uma área livre. Cada área carrega as próprias regras de uso (horário, capacidade).
+  - name: Evento
+    description: >
+      Agenda do condomínio: reuniões, reservas de áreas comuns, eventos sociais e manutenções.
+      Qualquer perfil cadastra. Evento cadastrado por **morador** nasce `PENDENTE` e só aparece para
+      os demais quando o síndico/administrador (permissão `EVENTO_APROVAR`) o aprova; os cadastrados
+      pelos outros perfis já nascem `APROVADO`. Reserva de área e manutenção de área não podem
+      se sobrepor a outro evento aprovado da mesma área.
 paths:
   /condominio:
     get:
@@ -842,6 +854,331 @@ paths:
           $ref: "#/components/responses/DadosInvalidos"
         "404":
           $ref: "#/components/responses/NaoEncontrado"
+  /areaComum:
+    get:
+      tags: [AreaComum]
+      operationId: listAreasComuns
+      summary: Lista as áreas comuns.
+      description: Exige a permissão `AREA_LER`. O recorte por condomínio vem do perfil ativo.
+      parameters:
+        - name: idCondominio
+          in: query
+          description: Restringe a um condomínio.
+          schema:
+            type: integer
+            format: int64
+        - name: ativa
+          in: query
+          schema:
+            type: boolean
+        - name: reservavel
+          in: query
+          description: Só as áreas que podem receber reservas.
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Áreas encontradas.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AreaComum"
+    post:
+      tags: [AreaComum]
+      operationId: createAreaComum
+      summary: Cadastra uma área comum.
+      description: Exige a permissão `AREA_ESCREVER`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AreaComum"
+      responses:
+        "201":
+          description: Área criada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AreaComum"
+        "400":
+          $ref: "#/components/responses/DadosInvalidos"
+        "409":
+          description: O condomínio já tem uma área com esse nome.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListaDeErros"
+  /areaComum/{idAreaComum}:
+    put:
+      tags: [AreaComum]
+      operationId: updateAreaComum
+      summary: Atualiza uma área comum.
+      description: Exige a permissão `AREA_ESCREVER`.
+      parameters:
+        - name: idAreaComum
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AreaComum"
+      responses:
+        "200":
+          description: Área atualizada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AreaComum"
+        "400":
+          $ref: "#/components/responses/DadosInvalidos"
+        "404":
+          $ref: "#/components/responses/NaoEncontrado"
+        "409":
+          description: Já existe outra área com esse nome no condomínio.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListaDeErros"
+    delete:
+      tags: [AreaComum]
+      operationId: deleteAreaComum
+      summary: Exclui uma área comum.
+      description: >
+        Exige a permissão `AREA_ESCREVER`. Recusa com 409 se houver evento ligado à área — nesse
+        caso o caminho é desativá-la (`ativa = false`), que a tira das opções sem apagar o histórico.
+      parameters:
+        - name: idAreaComum
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Área excluída.
+        "404":
+          $ref: "#/components/responses/NaoEncontrado"
+        "409":
+          $ref: "#/components/responses/EmUso"
+  /evento:
+    get:
+      tags: [Evento]
+      operationId: listEventos
+      summary: Lista os eventos de um período.
+      description: >
+        Exige a permissão `EVENTO_LER`. Quem não tem `EVENTO_APROVAR` recebe os eventos aprovados e,
+        além deles, os que ele mesmo cadastrou em qualquer situação (para acompanhar o pedido).
+        Nos eventos de outras pessoas, nome e e-mail do solicitante não são entregues.
+      parameters:
+        - name: idCondominio
+          in: query
+          description: Restringe a um condomínio.
+          schema:
+            type: integer
+            format: int64
+        - name: inicio
+          in: query
+          description: Primeiro dia do período (inclusive).
+          schema:
+            type: string
+            format: date
+        - name: fim
+          in: query
+          description: Último dia do período (exclusive) — a mesma convenção do calendário.
+          schema:
+            type: string
+            format: date
+        - name: situacao
+          in: query
+          schema:
+            type: string
+            enum: [PENDENTE, APROVADO, RECUSADO, CANCELADO]
+      responses:
+        "200":
+          description: Eventos do período.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Evento"
+    post:
+      tags: [Evento]
+      operationId: createEvento
+      summary: Cadastra um evento.
+      description: >
+        Exige a permissão `EVENTO_ESCREVER`. Nasce `PENDENTE` quando quem cadastra é morador, e
+        `APROVADO` nos demais casos. Reserva de área exige uma área reservável e ativa, dentro do
+        horário dela e sem sobrepor outro evento aprovado (409).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Evento"
+      responses:
+        "201":
+          description: Evento criado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Evento"
+        "400":
+          $ref: "#/components/responses/DadosInvalidos"
+        "409":
+          description: A área já está ocupada nesse horário.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListaDeErros"
+  /evento/{idEvento}:
+    get:
+      tags: [Evento]
+      operationId: findEvento
+      summary: Busca um evento pelo id.
+      description: Exige a permissão `EVENTO_LER`, com a mesma visibilidade da listagem.
+      parameters:
+        - name: idEvento
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Evento encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Evento"
+        "404":
+          $ref: "#/components/responses/NaoEncontrado"
+    put:
+      tags: [Evento]
+      operationId: updateEvento
+      summary: Altera um evento.
+      description: >
+        Exige a permissão `EVENTO_ESCREVER`. Quem tem `EVENTO_APROVAR` altera qualquer evento em
+        aberto ou aprovado; os demais, só os próprios e enquanto `PENDENTE`.
+      parameters:
+        - name: idEvento
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Evento"
+      responses:
+        "200":
+          description: Evento alterado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Evento"
+        "400":
+          $ref: "#/components/responses/DadosInvalidos"
+        "403":
+          description: O perfil não pode alterar este evento.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListaDeErros"
+        "404":
+          $ref: "#/components/responses/NaoEncontrado"
+        "409":
+          description: Conflito de horário na área, ou situação do evento não permite alterar.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListaDeErros"
+  /evento/{idEvento}/decisao:
+    post:
+      tags: [Evento]
+      operationId: decidirEvento
+      summary: Aprova ou recusa um evento pendente.
+      description: >
+        Exige a permissão `EVENTO_APROVAR`. Recusar exige o motivo. Aprovar confere de novo o
+        conflito de horário na área — outro evento pode ter sido aprovado nesse meio tempo (409).
+      parameters:
+        - name: idEvento
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DecisaoDeEvento"
+      responses:
+        "200":
+          description: Decisão registrada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Evento"
+        "400":
+          $ref: "#/components/responses/DadosInvalidos"
+        "404":
+          $ref: "#/components/responses/NaoEncontrado"
+        "409":
+          description: O evento não está pendente, ou a área já está ocupada nesse horário.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListaDeErros"
+  /evento/{idEvento}/cancelamento:
+    post:
+      tags: [Evento]
+      operationId: cancelarEvento
+      summary: Cancela um evento.
+      description: >
+        Exige a permissão `EVENTO_ESCREVER`. Quem cadastrou cancela o próprio pedido; quem tem
+        `EVENTO_APROVAR` cancela qualquer um. O evento fica `CANCELADO` (o histórico é mantido) e
+        libera o horário da área.
+      parameters:
+        - name: idEvento
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Evento cancelado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Evento"
+        "403":
+          description: O perfil não pode cancelar este evento.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListaDeErros"
+        "404":
+          $ref: "#/components/responses/NaoEncontrado"
+        "409":
+          description: O evento já está recusado ou cancelado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListaDeErros"
 components:
   responses:
     DadosInvalidos:
@@ -863,6 +1200,138 @@ components:
           schema:
             $ref: "#/components/schemas/ListaDeErros"
   schemas:
+    AreaComum:
+      type: object
+      description: >
+        Área comum do condomínio. O horário de funcionamento vale para as reservas: sem ele, a área
+        pode ser reservada a qualquer hora.
+      required: [nome]
+      properties:
+        id:
+          type: integer
+          format: int64
+          readOnly: true
+        idCondominio:
+          type: integer
+          format: int64
+          description: Condomínio da área. Omitido, vale o do perfil ativo.
+        nome:
+          type: string
+          maxLength: 60
+          description: Nome único dentro do condomínio — "Salão de festas".
+        descricao:
+          type: string
+          maxLength: 300
+        reservavel:
+          type: boolean
+          default: false
+          description: Verdadeiro se os moradores podem reservar a área. Elevador e hall, por exemplo, não.
+        capacidade:
+          type: integer
+          format: int32
+          minimum: 1
+          description: Quantas pessoas a área comporta.
+        horaAbertura:
+          type: string
+          pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+          example: "08:00"
+        horaFechamento:
+          type: string
+          pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+          example: "22:00"
+        ativa:
+          type: boolean
+          default: true
+          description: Área inativa some das opções, mas o histórico de eventos continua.
+    DecisaoDeEvento:
+      type: object
+      required: [aprovar]
+      properties:
+        aprovar:
+          type: boolean
+        motivo:
+          type: string
+          maxLength: 300
+          description: Obrigatório ao recusar.
+    Evento:
+      type: object
+      required: [tipo, titulo, inicio, fim]
+      properties:
+        id:
+          type: integer
+          format: int64
+          readOnly: true
+        idCondominio:
+          type: integer
+          format: int64
+          description: Omitido, vale o condomínio do perfil ativo.
+        idAreaComum:
+          type: integer
+          format: int64
+          description: >
+            Obrigatório em `RESERVA_AREA`; opcional nos demais (por exemplo, manutenção da piscina).
+        nomeDaAreaComum:
+          type: string
+          readOnly: true
+        tipo:
+          type: string
+          enum: [REUNIAO, RESERVA_AREA, SOCIAL, MANUTENCAO, OUTRO]
+        titulo:
+          type: string
+          maxLength: 100
+        descricao:
+          type: string
+          maxLength: 500
+        inicio:
+          type: string
+          format: date-time
+        fim:
+          type: string
+          format: date-time
+          description: Exclusivo — a convenção do calendário. Em dia inteiro, é a meia-noite do dia seguinte.
+        diaInteiro:
+          type: boolean
+          default: false
+        situacao:
+          type: string
+          readOnly: true
+          enum: [PENDENTE, APROVADO, RECUSADO, CANCELADO]
+        idUnidade:
+          type: integer
+          format: int64
+          readOnly: true
+          description: Unidade de quem cadastrou, quando é morador.
+        rotuloDaUnidade:
+          type: string
+          readOnly: true
+        solicitanteNome:
+          type: string
+          readOnly: true
+          description: Só para quem cadastrou e para quem aprova.
+        solicitanteEmail:
+          type: string
+          readOnly: true
+          description: Só para quem cadastrou e para quem aprova.
+        motivoDaDecisao:
+          type: string
+          readOnly: true
+        dataDaDecisao:
+          type: string
+          format: date-time
+          readOnly: true
+        ehMeu:
+          type: boolean
+          readOnly: true
+          description: O perfil da requisição foi quem cadastrou o evento.
+        podeEditar:
+          type: boolean
+          readOnly: true
+        podeCancelar:
+          type: boolean
+          readOnly: true
+        podeDecidir:
+          type: boolean
+          readOnly: true
     Unidade:
       type: object
       description: >

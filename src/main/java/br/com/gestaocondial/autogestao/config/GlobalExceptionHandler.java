@@ -15,6 +15,11 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 
 import br.com.gestaocondial.autogestao.exception.AcessoNegadoException;
+import br.com.gestaocondial.autogestao.exception.AreaComumJaExisteException;
+import br.com.gestaocondial.autogestao.exception.AreaComumNaoEncontradaException;
+import br.com.gestaocondial.autogestao.exception.ConflitoDeAgendaException;
+import br.com.gestaocondial.autogestao.exception.EventoNaoEncontradoException;
+import br.com.gestaocondial.autogestao.exception.SituacaoDoEventoInvalidaException;
 import br.com.gestaocondial.autogestao.exception.CobrancaOrdinariaNaoEncontradaException;
 import br.com.gestaocondial.autogestao.exception.CondominioNaoEncontradoException;
 import br.com.gestaocondial.autogestao.exception.EnderecoNaoEncontradoException;
@@ -47,7 +52,8 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler({ CondominioNaoEncontradoException.class, UnidadeNaoEncontradaException.class,
 			PessoaNaoEncontradaException.class, TaxaExtraNaoEncontradaException.class,
-			CobrancaOrdinariaNaoEncontradaException.class })
+			CobrancaOrdinariaNaoEncontradaException.class, AreaComumNaoEncontradaException.class,
+			EventoNaoEncontradoException.class })
 	public ResponseEntity<ListaDeErrosOutputDto> handleNaoEncontrado(RuntimeException ex) {
 		return resposta(null, ex.getMessage(), HttpStatus.NOT_FOUND);
 	}
@@ -72,6 +78,17 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(UnidadeJaExisteException.class)
 	public ResponseEntity<ListaDeErrosOutputDto> handleUnidadeJaExiste(UnidadeJaExisteException ex) {
 		return resposta("numero", ex.getMessage(), HttpStatus.CONFLICT);
+	}
+
+	@ExceptionHandler(AreaComumJaExisteException.class)
+	public ResponseEntity<ListaDeErrosOutputDto> handleAreaComumJaExiste(AreaComumJaExisteException ex) {
+		return resposta("nome", ex.getMessage(), HttpStatus.CONFLICT);
+	}
+
+	/** Área ocupada no horário, ou operação que não cabe na situação atual do evento. */
+	@ExceptionHandler({ ConflitoDeAgendaException.class, SituacaoDoEventoInvalidaException.class })
+	public ResponseEntity<ListaDeErrosOutputDto> handleConflitoDeAgenda(RuntimeException ex) {
+		return resposta(null, ex.getMessage(), HttpStatus.CONFLICT);
 	}
 
 	/** Exclusao recusada porque o registro ainda esta vinculado a outros. */
